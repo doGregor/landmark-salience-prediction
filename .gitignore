@@ -1,0 +1,7 @@
+.DS_Store
+.idea/
+__pycache__/
+BA_Richter/
+LM_Images_downscaled/
+learning_output/
+output_images/
