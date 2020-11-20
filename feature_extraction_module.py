@@ -24,7 +24,7 @@ class FeatureExtractor():
         st = st.replace('.', '_')
         st = st.replace(':', '_')
         st = st.replace(' ', '_')
-        fig_name = "saved_plots/" + st + ".png"
+        fig_name = "plots/" + st + ".png"
         fig.savefig(fig_name)
 
     def get_shape_vgg19(self, image, input_shape=(298, 224, 3)):
