@@ -1,13 +1,13 @@
 import os
 import numpy as np
 import tensorflow as tf
-from sklearn.decomposition import MiniBatchDictionaryLearning
 import math
 import matplotlib.pyplot as plt
 import pickle
 from sklearn.decomposition import NMF
 from sklearn.decomposition import PCA
 from sklearn.decomposition import FastICA
+from sklearn.decomposition import MiniBatchDictionaryLearning
 import datetime
 
 
@@ -15,15 +15,16 @@ class FeatureExtractor():
     def __init__(self):
         pass
 
-    def _save_image(self, image_data, title, rows=3, columns=3):
+    def _save_image(self, image_data, title, rows=3, columns=3, cmap='gray'):
         fig = plt.figure(figsize=(6, 6))
         for i in range(1, columns * rows + 1):
             fig.add_subplot(rows, columns, i)
-            plt.imshow(image_data[i - 1], cmap='gray')
+            plt.imshow(image_data[i - 1], cmap=cmap)
         st = str(datetime.datetime.now())
         st = st.replace('.', '_')
         st = st.replace(':', '_')
         st = st.replace(' ', '_')
+        st = st.replace('-', '_')
         fig_name = "plots/" + title + "_" + st + ".png"
         fig.savefig(fig_name)
 
@@ -62,12 +63,9 @@ class FeatureExtractor():
 
         return content_outputs
 
-    def get_style_vgg19(self, image, input_shape=(298, 224, 3)):
-        x = tf.keras.preprocessing.image.img_to_array(image)
-        x = tf.image.resize(x, input_shape[:2])
+    def get_style_vgg19(self, image, input_shape=(298, 224, 3), save_fig=True):
+        x = tf.image.resize(image, input_shape[:2])
         x = np.array([x])
-        # x = x * 255.0
-        x = tf.keras.applications.vgg19.preprocess_input(x)
 
         style_layers = ['block1_conv1',
                         'block2_conv1',
@@ -77,6 +75,23 @@ class FeatureExtractor():
 
         style_extractor = self._vgg_layers(style_layers, target_size=input_shape)
         style_outputs = style_extractor(x)
+
+        '''
+        for output in style_outputs:
+            output = np.average(output[0], axis=2)
+            #print(output.shape)
+            plt.imshow(output)
+            plt.show()
+        '''
+
+        if save_fig:
+            for idx_layer, output in enumerate(style_outputs):
+                images_to_plot = []
+                indices = np.random.randint(0, output.shape[3], 9)
+                for idx in indices:
+                    images_to_plot.append(output[0, :, :, idx])
+                title = str(style_layers[idx_layer]) + " Size: " + str(output[0, :, :, 0].shape) + " Number: " + str(output[0, 0, 0, :].shape)
+                self._save_image(images_to_plot, title, cmap='viridis')
 
         ###############
         # plots
@@ -100,6 +115,10 @@ class FeatureExtractor():
 
         style_outputs = [self._gram_matrix(style_output)
                          for style_output in style_outputs]
+
+        for output in style_outputs:
+            plt.imshow(output[0])
+            plt.show()
 
         ###############
         # plots
@@ -249,9 +268,24 @@ if __name__ == '__main__':
     plt.show()
     '''
 
+    '''
+    (X_train, Y_train), (X_test, Y_test) = data_loader.get_train_test_binary(gray=True)
+
+    X_train, X_test = feature_extractor.PCA(X_train, X_test, components=2, save_fig=False, save_model=False)
+
+    x, y = X_test.T
+    plt.scatter(x, y, c=Y_test)
+    plt.show()
+    '''
+
     from image_data_module import TrainTestData
+    from salience_prediction_module import SaliencePrediction
+
     data_loader = TrainTestData()
+    salience_predictor = SaliencePrediction()
 
-    (X_train, Y_train), (X_test, Y_test) = data_loader.get_train_test_salience(gray=True)
+    (X_train, Y_train), (X_test, Y_test) = data_loader.get_train_test_salience(gray=False)
+    (X_train, Y_train), (X_test, Y_test) = salience_predictor.scale_data(X_train, Y_train, X_test, Y_test, labels='regression')
 
-    X_train, X_test = feature_extractor.dictionary_learning(X_train, X_test)
+    #X_train[5]
+    style_output = feature_extractor.get_style_vgg19(X_train[0], save_fig=False)
