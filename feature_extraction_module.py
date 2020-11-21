@@ -15,7 +15,7 @@ class FeatureExtractor():
     def __init__(self):
         pass
 
-    def _save_image(self, image_data, rows=3, columns=3):
+    def _save_image(self, image_data, title, rows=3, columns=3):
         fig = plt.figure(figsize=(6, 6))
         for i in range(1, columns * rows + 1):
             fig.add_subplot(rows, columns, i)
@@ -24,7 +24,7 @@ class FeatureExtractor():
         st = st.replace('.', '_')
         st = st.replace(':', '_')
         st = st.replace(' ', '_')
-        fig_name = "plots/" + st + ".png"
+        fig_name = "plots/" + title + "_" + st + ".png"
         fig.savefig(fig_name)
 
     def get_shape_vgg19(self, image, input_shape=(298, 224, 3)):
@@ -127,133 +127,106 @@ class FeatureExtractor():
         num_locations = tf.cast(input_shape[1] * input_shape[2], tf.float32)
         return result / (num_locations)
 
-    def apply_dictionary_learning(self, image_batch, components=50):
-        height, width = image_batch.shape[1], image_batch.shape[2]
-        image_batch = image_batch.reshape(image_batch.shape[0], image_batch.shape[1] * image_batch.shape[2])
-        dict_results = {}
+    def dictionary_learning(self, train_data, test_data, components=50, save_fig=True, save_model=True):
+        height, width = train_data.shape[1], train_data.shape[2]
+        train_data = train_data.reshape(train_data.shape[0], train_data.shape[1] * train_data.shape[2])
+        test_data = test_data.reshape(test_data.shape[0], test_data.shape[1] * test_data.shape[2])
 
         dictionary = MiniBatchDictionaryLearning(n_components=components)
-        dictionary.fit(image_batch)
-        dict_results["model"] = dictionary
+        train_data_dl = dictionary.fit_transform(train_data)
+        test_data_dl = dictionary.transform(test_data)
 
-        components = dictionary.components_
-        dict_results["components"] = components
+        if save_model:
+            dict_results = {}
+            dict_results["model"] = dictionary
+            with open(r"learning_output/dictionary_learning.pickle", "wb") as output_file:
+                pickle.dump(dict_results, output_file)
 
-        with open(r"learning_output/dictionary_learning.pickle", "wb") as output_file:
-            pickle.dump(dict_results, output_file)
+        if save_fig:
+            components = dictionary.components_
+            index = np.random.choice(components.shape[0], 9, replace=False)
+            images_to_plot = components[index]
+            images_to_plot = images_to_plot.reshape(9, height, width)
+            self._save_image(images_to_plot, "DL_components")
 
-        ###############
-        # plots
-        '''
-        components_image_shape = components.reshape(components.shape[0], height, width)
-        index = np.random.choice(components_image_shape.shape[0], 9, replace=False)
-        images_to_plot = components_image_shape[index]
-        fig = plt.figure(figsize=(6, 6))
-        columns = 3
-        rows = 3
-        for i in range(1, columns * rows + 1):
-            fig.add_subplot(rows, columns, i)
-            plt.imshow(images_to_plot[i - 1], cmap='gray')
-        plt.show()
-        '''
-        ###############
+        return train_data_dl, test_data_dl
 
-    def get_dictionary_components(self):
+    def get_dictionary(self):
         with open(r"learning_output/dictionary_learning.pickle", "rb") as input_file:
             dict_results = pickle.load(input_file)
-        return dict_results["components"]
+        return dict_results["model"]
 
-    def apply_ICA(self, image_batch, components=10):
-        height, width = image_batch.shape[1], image_batch.shape[2]
-        image_batch = image_batch.reshape(image_batch.shape[0], image_batch.shape[1] * image_batch.shape[2])
+    def ICA(self, train_data, test_data, components=10, save_fig=True, save_model=True):
+        height, width = train_data.shape[1], train_data.shape[2]
+        train_data = train_data.reshape(train_data.shape[0], train_data.shape[1] * train_data.shape[2])
+        test_data = test_data.reshape(test_data.shape[0], test_data.shape[1] * test_data.shape[2])
 
-        model = self.get_ICA_model()
-        if model == "":
-            print("[INFO] ICA model is fitted from scratch")
+        ica = FastICA(n_components=components, max_iter=1000, tol=0.001)
+        train_data_ica = ica.fit_transform(train_data)
+        test_data_ica = ica.transform(test_data)
+
+        if save_model:
             ICA_results = {}
-            ica = FastICA(n_components=components)
-            ica.fit(image_batch)
             ICA_results["model"] = ica
             with open(r"learning_output/ICA.pickle", "wb") as output_file:
                 pickle.dump(ICA_results, output_file)
-            transformed_data = ica.transform(image_batch)
-        else:
-            print("[INFO] saved ICA model is used")
-            ica = model
-            transformed_data = ica.transform(image_batch)
 
-        return transformed_data, ica.components_
+        if save_fig:
+            components = ica.components_
+            index = np.random.choice(components.shape[0], 9, replace=False)
+            images_to_plot = components[index]
+            images_to_plot = images_to_plot.reshape(9, height, width)
+            self._save_image(images_to_plot, "ICA_components")
 
-        ###############
-        # plots
-        '''
-        components_image_shape = components.reshape(components.shape[0], height, width)
-        index = np.random.choice(components_image_shape.shape[0], 9, replace=False)
-        images_to_plot = components_image_shape[index]
-        fig = plt.figure(figsize=(6, 6))
-        columns = 3
-        rows = 3
-        for i in range(1, columns * rows + 1):
-            fig.add_subplot(rows, columns, i)
-            plt.imshow(images_to_plot[i - 1], cmap='gray')
-        plt.show()
-        '''
-        ###############
+        return train_data_ica, test_data_ica
 
-    def get_ICA_model(self):
-        try:
-            with open(r"learning_output/ICA.pickle", "rb") as input_file:
-                dict_results = pickle.load(input_file)
-                model = dict_results["model"]
-        except:
-            model = ""
-        return model
+    def PCA(self, train_data, test_data, components=10, save_fig=True, save_model=True):
+        height, width = train_data.shape[1], train_data.shape[2]
+        train_data = train_data.reshape(train_data.shape[0], train_data.shape[1] * train_data.shape[2])
+        test_data = test_data.reshape(test_data.shape[0], test_data.shape[1] * test_data.shape[2])
 
-    def apply_PCA(self, image_batch, components=10):
-        height, width = image_batch.shape[1], image_batch.shape[2]
-        image_batch = image_batch.reshape(image_batch.shape[0], image_batch.shape[1] * image_batch.shape[2])
+        pca = PCA(n_components=components)
+        train_data_pca = pca.fit_transform(train_data)
+        test_data_pca = pca.transform(test_data)
 
-        model = self.get_PCA_model()
-        if model == "":
-            print("[INFO] PCA model is fitted from scratch")
+        if save_model:
             PCA_results = {}
-            pca = PCA(n_components=components)
-            pca.fit(image_batch)
             PCA_results["model"] = pca
             with open(r"learning_output/PCA.pickle", "wb") as output_file:
                 pickle.dump(PCA_results, output_file)
-            transformed_data = pca.transform(image_batch)
-        else:
-            print("[INFO] saved PCA model is used")
-            pca = model
-            transformed_data = pca.transform(image_batch)
 
-        return transformed_data, pca.components_
+        if save_fig:
+            components = pca.components_
+            index = np.random.choice(components.shape[0], 9, replace=False)
+            images_to_plot = components[index]
+            images_to_plot = images_to_plot.reshape(9, height, width)
+            self._save_image(images_to_plot, "PCA_components")
 
-        ###############
-        # plots
-        '''
-        components_image_shape = components.reshape(components.shape[0], height, width)
-        index = np.random.choice(components_image_shape.shape[0], 9, replace=False)
-        images_to_plot = components_image_shape[index]
-        fig = plt.figure(figsize=(6, 6))
-        columns = 3
-        rows = 3
-        for i in range(1, columns * rows + 1):
-            fig.add_subplot(rows, columns, i)
-            plt.imshow(images_to_plot[i - 1], cmap='gray')
-        plt.show()
-        '''
-        ###############
+        return train_data_pca, test_data_pca
 
-    def get_PCA_model(self):
-        try:
-            with open(r"learning_output/PCA.pickle", "rb") as input_file:
-                dict_results = pickle.load(input_file)
-                model = dict_results["model"]
-        except:
-            model = ""
-        return model
+    def NMF(self, train_data, test_data, components=10, save_fig=True, save_model=True):
+        height, width = train_data.shape[1], train_data.shape[2]
+        train_data = train_data.reshape(train_data.shape[0], train_data.shape[1] * train_data.shape[2])
+        test_data = test_data.reshape(test_data.shape[0], test_data.shape[1] * test_data.shape[2])
+
+        nmf = NMF(n_components=components)
+        train_data_nmf = nmf.fit_transform(train_data)
+        test_data_nmf = nmf.transform(test_data)
+
+        if save_model:
+            NMF_results = {}
+            NMF_results["model"] = nmf
+            with open(r"learning_output/NMF.pickle", "wb") as output_file:
+                pickle.dump(NMF_results, output_file)
+
+        if save_fig:
+            components = nmf.components_
+            index = np.random.choice(components.shape[0], 9, replace=False)
+            images_to_plot = components[index]
+            images_to_plot = images_to_plot.reshape(9, height, width)
+            self._save_image(images_to_plot, "NMF_components")
+
+        return train_data_nmf, test_data_nmf
 
 
 if __name__ == '__main__':
@@ -281,5 +254,4 @@ if __name__ == '__main__':
 
     (X_train, Y_train), (X_test, Y_test) = data_loader.get_train_test_salience(gray=True)
 
-    X_train_pca_transformed, components = feature_extractor.apply_PCA(X_train, components=5)
-    print(X_train_pca_transformed.shape)
+    X_train, X_test = feature_extractor.dictionary_learning(X_train, X_test)
