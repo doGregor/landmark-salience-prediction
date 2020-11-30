@@ -27,6 +27,7 @@ class SaliencePrediction():
         model = tf.keras.models.Sequential()
         model.add(tf.keras.applications.VGG19(include_top=False, weights='imagenet', input_shape=image_shape))
         model.add(tf.keras.layers.Flatten())
+        model.add(tf.keras.layers.Dropout(0.5))
         model.add(tf.keras.layers.Dense(1, activation="linear"))
 
         model.compile(loss="mean_squared_error", optimizer='adam', metrics=['mse', 'mae', 'mape'])
@@ -34,20 +35,31 @@ class SaliencePrediction():
 
         return model
 
-    def train_cnn_for_regression(self, model, train_data, train_labels, test_data, test_labels, epochs=10, batch_size=16, save=False):
+    def train_cnn_for_regression(self, model, train_data, train_labels, test_data, test_labels, epochs=10, batch_size=16,
+                                 save=False, evaluate=True):
         history = model.fit(train_data, train_labels, epochs=epochs,
                             validation_data=(test_data, test_labels),
                             batch_size=batch_size)
-        plt.plot(history.history['mse'])
-        plt.plot(history.history['mae'])
-        plt.plot(history.history['mape'])
-        plt.savefig('plots/regression_cnn.png')
+
+        if evaluate:
+
+            evaluation = model.evaluate(test_data, test_labels)
+
+            plt.plot(history.history['mse'], label="train mse")
+            plt.plot(evaluation.history['mse'], label="test mse")
+            plt.savefig('plots/mse_regression_cnn.png')
+            plt.plot(history.history['mae'], label="train mae")
+            plt.plot(evaluation.history['mae'], label="test mae")
+            plt.savefig('plots/mae_regression_cnn.png')
+            plt.plot(history.history['mape'], label="train mape")
+            plt.plot(evaluation.history['mape'], label="test mape")
+            plt.savefig('plots/mape_regression_cnn.png')
 
         if save:
             model.save('nn_models/regression_cnn_images_directly.h5')
             del model
 
-    def predict(self, model_name, X_data, Y_data):
+    def predict(self, model_name, X_data):
         model_path = "nn_models/" + model_name + ".h5"
         model = tf.keras.models.load_model(model_path)
 
@@ -69,10 +81,10 @@ class SaliencePrediction():
 
     def train_cnn_for_classifiaction(self, model, train_data, train_labels, test_data, test_labels, epochs=10, batch_size=16, save=False):
         history = model.fit(train_data, train_labels, validation_data=(test_data, test_labels),
-                            epochs=epochs, batch_size=batch_size, verbose=0)
+                            epochs=epochs, batch_size=batch_size, verbose=1)
         # evaluate the model
-        _, train_acc = model.evaluate(train_data, train_labels, verbose=0)
-        _, test_acc = model.evaluate(test_data, test_labels, verbose=0)
+        _, train_acc = model.evaluate(train_data, train_labels, verbose=1)
+        _, test_acc = model.evaluate(test_data, test_labels, verbose=1)
         print('Train: %.3f, Test: %.3f' % (train_acc, test_acc))
         # plot loss during training
         plt.subplot(211)
