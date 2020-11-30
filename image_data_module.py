@@ -12,7 +12,7 @@ class TrainTestData():
             "salience_csv/Landmarken_mit_Faktorenwerten.csv",
             sep=";",
             decimal=",")
-        self.lm_images_source = "LM_images_downscaled"
+        self.lm_images_source = "LM_Images_downscaled"
         self.id_column = self.lm_images_df["ID"]
         self.salience_column = self.lm_images_df["Salienz_gerundet"]
         try:
