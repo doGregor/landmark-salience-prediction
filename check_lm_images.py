@@ -4,7 +4,7 @@ import os
 
 DEBUG_INFO = False
 
-lm_images_df = pd.read_csv("BA_Richter/download_2020-10-14_08-33-39/2_Datensätze/Landmarken mit Faktorenwerten.csv",
+lm_images_df = pd.read_csv("salience_csv/Landmarken_mit_Faktorenwerten.csv",
                            sep=";",
                            decimal=",")
 id_column = lm_images_df["ID"]
