@@ -6,3 +6,5 @@ LM_Images_downscaled/
 learning_output/
 output_images/
 plots/
+.ipynb_checkpoints/
+
