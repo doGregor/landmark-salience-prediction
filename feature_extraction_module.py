@@ -28,17 +28,20 @@ class FeatureExtractor():
         fig_name = "plots/" + title + "_" + st + ".png"
         fig.savefig(fig_name)
 
-    def get_shape_vgg19(self, image, input_shape=(298, 224, 3)):
-        x = tf.keras.preprocessing.image.img_to_array(image)
-        x = tf.image.resize(x, input_shape[:2])
+    def get_content_vgg19(self, image, input_shape=(298, 224, 3), save_fig=True):
+        x = tf.image.resize(image, input_shape[:2])
         x = np.array([x])
-        # x = x * 255.0
-        x = tf.keras.applications.vgg19.preprocess_input(x)
 
         content_layers = ['block5_conv2']
 
         content_extractor = self._vgg_layers(content_layers, target_size=input_shape)
         content_outputs = content_extractor(x)
+
+        print(content_outputs.shape)
+        output = np.average(content_outputs[0], axis=2)
+        print(output.shape)
+        plt.imshow(output)
+        plt.show()
 
         ###############
         # plots
@@ -92,26 +95,6 @@ class FeatureExtractor():
                     images_to_plot.append(output[0, :, :, idx])
                 title = str(style_layers[idx_layer]) + " Size: " + str(output[0, :, :, 0].shape) + " Number: " + str(output[0, 0, 0, :].shape)
                 self._save_image(images_to_plot, title, cmap='viridis')
-
-        ###############
-        # plots
-        '''
-        import matplotlib.pyplot as plt
-        for idx_layer, output in enumerate(style_outputs):
-            images_to_plot = []
-            indices = np.random.randint(0, output.shape[3], 16)
-            for idx in indices:
-                images_to_plot.append(output[0, :, :, idx])
-            fig = plt.figure(figsize=(6, 6))
-            columns = 4
-            rows = 4
-            for i in range(1, columns * rows + 1):
-                fig.add_subplot(rows, columns, i)
-                plt.imshow(images_to_plot[i - 1])
-            plt.suptitle(str(style_layers[idx_layer]) + " Size: " + str(output[0, :, :, 0].shape) + " Number: " + str(output[0, 0, 0, :].shape))
-            plt.show()
-        '''
-        ###############
 
         style_outputs = [self._gram_matrix(style_output)
                          for style_output in style_outputs]
@@ -284,8 +267,31 @@ if __name__ == '__main__':
     data_loader = TrainTestData()
     salience_predictor = SaliencePrediction()
 
-    (X_train, Y_train), (X_test, Y_test) = data_loader.get_train_test_salience(gray=False)
-    (X_train, Y_train), (X_test, Y_test) = salience_predictor.scale_data(X_train, Y_train, X_test, Y_test, labels='regression')
+    (X_train, Y_train), (X_test, Y_test) = data_loader.get_train_test_salience(gray=True)
+    #(X_train, Y_train), (X_test, Y_test) = salience_predictor.scale_data(X_train, Y_train, X_test, Y_test, labels='regression')
 
     #X_train[5]
-    style_output = feature_extractor.get_style_vgg19(X_train[0], save_fig=False)
+    #style_output = feature_extractor.get_style_vgg19(X_train[0], save_fig=False)
+    #content_output = feature_extractor.get_content_vgg19(X_train[5], save_fig=False)
+
+    from scipy import ndimage, misc
+
+    image = X_train[5][:, :, 0]
+    im = image.astype('int32')
+    dx = ndimage.sobel(im, 0)  # horizontal derivative
+    dy = ndimage.sobel(im, 1)  # vertical derivative
+    mag = np.hypot(dx, dy)  # magnitude
+    mag *= 255.0 / np.max(mag)  # normalize (Q&D)
+    plt.imshow(mag, cmap='gray')
+    plt.show()
+
+    '''
+    image = ndimage.sobel(X_train[5])
+    dx = ndimage.sobel(image, 0)
+    dy = ndimage.sobel(image, 1)
+    mag = np.hypot(dx, dy)
+    plt.imshow(mag, cmap='gray')
+    plt.show()
+    '''
+
+
