@@ -36,7 +36,7 @@ class FeatureExtractor():
 
         content_layers = ['block5_conv2']
 
-        content_extractor = self._vgg_layers(content_layers, target_size=input_shape)
+        content_extractor = self._vgg_layers(content_layers, input_shape=input_shape)
         content_outputs = content_extractor(x)
 
         print(content_outputs.shape)
@@ -44,6 +44,9 @@ class FeatureExtractor():
         print(output.shape)
         plt.imshow(output)
         plt.show()
+
+        content_outputs = [self._gram_matrix(content_output)
+                           for content_output in content_outputs]
 
         ###############
         # plots
@@ -69,25 +72,19 @@ class FeatureExtractor():
         return content_outputs
 
     def get_style_vgg19(self, image, input_shape=(298, 224, 3), save_fig=True):
+        '''
+        print(image)
         x = tf.image.resize(image, input_shape[:2])
+        print(x)
         x = np.array([x])
+        '''
+        x = image
 
-        style_layers = ['block1_conv1',
-                        'block2_conv1',
-                        'block3_conv1',
-                        'block4_conv1',
-                        'block5_conv1']
+        style_layers = ['block5_conv1']
 
-        style_extractor = self._vgg_layers(style_layers, target_size=input_shape)
+        style_extractor = self._vgg_layers(style_layers, input_shape=input_shape)
         style_outputs = style_extractor(x)
-
-        '''
-        for output in style_outputs:
-            output = np.average(output[0], axis=2)
-            #print(output.shape)
-            plt.imshow(output)
-            plt.show()
-        '''
+        print(style_outputs.shape)
 
         if save_fig:
             for idx_layer, output in enumerate(style_outputs):
@@ -100,26 +97,20 @@ class FeatureExtractor():
 
         style_outputs = [self._gram_matrix(style_output)
                          for style_output in style_outputs]
+        style_outputs = np.asarray(style_outputs)
+        print(style_outputs.shape)
 
-        for output in style_outputs:
-            plt.imshow(output[0])
-            plt.show()
-
-        ###############
-        # plots
-        '''
-        for idx_layer, output in enumerate(style_outputs):
-            import matplotlib.pyplot as plt
-            plt.imshow(np.asarray(output[0]))
-            plt.title("Gram matrix for " + str(style_layers[idx_layer]))
-            plt.show()
-        '''
-        ###############
+        if save_fig:
+            for idx_layer, output in enumerate(style_outputs):
+                import matplotlib.pyplot as plt
+                plt.imshow(np.asarray(output[0]))
+                plt.title("Gram matrix for " + str(style_layers[idx_layer]))
+                plt.show()
 
         return style_outputs
 
-    def _vgg_layers(self, layer_names, target_size=(298, 224, 3)):
-        vgg = tf.keras.applications.VGG19(include_top=False, weights='imagenet', input_shape=target_size)
+    def _vgg_layers(self, layer_names, input_shape=(298, 224, 3)):
+        vgg = tf.keras.applications.VGG19(include_top=False, weights='imagenet', input_shape=input_shape)
         vgg.trainable = False
         outputs = [vgg.get_layer(name).output for name in layer_names]
         model = tf.keras.Model([vgg.input], outputs)
@@ -328,10 +319,9 @@ if __name__ == '__main__':
     salience_predictor = SaliencePrediction()
 
     (X_train, Y_train), (X_test, Y_test) = data_loader.get_train_test_salience(gray=False)
-    #(X_train, Y_train), (X_test, Y_test) = salience_predictor.scale_data(X_train, Y_train, X_test, Y_test, labels='regression')
+    (X_train, Y_train), (X_test, Y_test) = salience_predictor.scale_data(X_train, Y_train, X_test, Y_test, labels='regression')
 
-    #X_train[5]
-    #style_output = feature_extractor.get_style_vgg19(X_train[0], save_fig=False)
+    style_output = feature_extractor.get_style_vgg19(X_test, save_fig=False)
     #content_output = feature_extractor.get_content_vgg19(X_train[5], save_fig=False)
 
     '''
