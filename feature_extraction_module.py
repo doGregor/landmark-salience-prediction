@@ -9,6 +9,8 @@ from sklearn.decomposition import PCA
 from sklearn.decomposition import FastICA
 from sklearn.decomposition import MiniBatchDictionaryLearning
 import datetime
+from scipy import ndimage
+import cv2
 
 
 class FeatureExtractor():
@@ -230,6 +232,64 @@ class FeatureExtractor():
 
         return train_data_nmf, test_data_nmf
 
+    def sobel_filter(self, train_data, test_data):
+        """
+        Applies sobel edge computation on train/test data image batches.
+        :param train_data: Image data batch in (x,y,z,1) GRAY format (train)
+        :param test_data: Image data batch in (x,y,z,1) GRAY format (test)
+        :return: returns two np arrays for train/test batch with sobel filter output in shape (x, y, z, 1)
+        """
+        dim_1 = train_data.shape[1]
+        dim_2 = train_data.shape[2]
+        train_data_out = np.zeros(train_data.shape)
+        test_data_out = np.zeros(test_data.shape)
+        for idx in range(train_data.shape[0]):
+            image = train_data[idx][:, :, 0]
+            im = image.astype('int32')
+            dx = ndimage.sobel(im, 0)
+            dy = ndimage.sobel(im, 1)
+            mag = np.hypot(dx, dy)
+            mag *= 255.0 / np.max(mag)
+            mag = mag.reshape(dim_1, dim_2, 1)
+            train_data_out[idx] = mag
+        for idx in range(test_data.shape[0]):
+            image = test_data[idx][:, :, 0]
+            im = image.astype('int32')
+            dx = ndimage.sobel(im, 0)
+            dy = ndimage.sobel(im, 1)
+            mag = np.hypot(dx, dy)
+            mag *= 255.0 / np.max(mag)
+            mag = mag.reshape(dim_1, dim_2, 1)
+            test_data_out[idx] = mag
+        return train_data_out, test_data_out
+
+    def color_histogram(self, train_data, test_data):
+        """
+        Applies color histogram computation on train/test data image batches.
+        :param train_data: Image data batch in (x,y,z,3) RGB format (train)
+        :param test_data: Image data batch in (x,y,z,3) RGB format (test)
+        :return: returns two np arrays for train/test batch with color histograms in shape (x, 180, 256, 1)
+
+        INFO: use plt.imshow(image, interpolation='nearest') to plot images for better results
+        """
+        train_data = train_data.astype(np.uint8)
+        test_data = test_data.astype(np.uint8)
+        train_data_out = []
+        test_data_out = []
+        for idx in range(train_data.shape[0]):
+            image = train_data[idx]
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+            hist = cv2.calcHist([hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
+            train_data_out.append(hist.reshape(180, 256, 1))
+        for idx in range(test_data.shape[0]):
+            image = test_data[idx]
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+            hist = cv2.calcHist([hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
+            test_data_out.append(hist.reshape(180, 256, 1))
+        return np.asarray(train_data_out), np.asarray(test_data_out)
+
 
 if __name__ == '__main__':
     feature_extractor = FeatureExtractor()
@@ -267,31 +327,18 @@ if __name__ == '__main__':
     data_loader = TrainTestData()
     salience_predictor = SaliencePrediction()
 
-    (X_train, Y_train), (X_test, Y_test) = data_loader.get_train_test_salience(gray=True)
+    (X_train, Y_train), (X_test, Y_test) = data_loader.get_train_test_salience(gray=False)
     #(X_train, Y_train), (X_test, Y_test) = salience_predictor.scale_data(X_train, Y_train, X_test, Y_test, labels='regression')
 
     #X_train[5]
     #style_output = feature_extractor.get_style_vgg19(X_train[0], save_fig=False)
     #content_output = feature_extractor.get_content_vgg19(X_train[5], save_fig=False)
 
-    from scipy import ndimage, misc
-
-    image = X_train[5][:, :, 0]
-    im = image.astype('int32')
-    dx = ndimage.sobel(im, 0)  # horizontal derivative
-    dy = ndimage.sobel(im, 1)  # vertical derivative
-    mag = np.hypot(dx, dy)  # magnitude
-    mag *= 255.0 / np.max(mag)  # normalize (Q&D)
-    plt.imshow(mag, cmap='gray')
-    plt.show()
-
     '''
-    image = ndimage.sobel(X_train[5])
-    dx = ndimage.sobel(image, 0)
-    dy = ndimage.sobel(image, 1)
-    mag = np.hypot(dx, dy)
-    plt.imshow(mag, cmap='gray')
+    image = X_train[5]
+    image = image.astype(np.uint8)
+    #image = image.reshape(image.shape[0], image.shape[1])
+    plt.imshow(image)
     plt.show()
     '''
-
 
