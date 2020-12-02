@@ -18,10 +18,20 @@ class FeatureExtractor():
         pass
 
     def _save_image(self, image_data, title, rows=3, columns=3, cmap='gray'):
+        """
+        Saves a plot of images.
+        :param image_data: List of images [len(list) == rows*columns]
+        :param title: Title to include in plot and file name
+        :param rows: number of rows in plot if multiple images
+        :param columns: number of columns in plot if multiple images
+        :param cmap: colormap from matplotlib, e.g. 'gray' if grayscale
+        :return: returns nothing, saves plot to /plots folder
+        """
         fig = plt.figure(figsize=(6, 6))
         for i in range(1, columns * rows + 1):
             fig.add_subplot(rows, columns, i)
             plt.imshow(image_data[i - 1], cmap=cmap)
+            plt.suptitle(title)
         st = str(datetime.datetime.now())
         st = st.replace('.', '_')
         st = st.replace(':', '_')
@@ -30,84 +40,67 @@ class FeatureExtractor():
         fig_name = "plots/" + title + "_" + st + ".png"
         fig.savefig(fig_name)
 
-    def get_content_vgg19(self, image, input_shape=(298, 224, 3), save_fig=True):
-        x = tf.image.resize(image, input_shape[:2])
-        x = np.array([x])
+    def get_content_vgg19(self, image_batch, input_shape=(298, 224, 3), batch_size=16):
+        """
+        Computes gram matrices for image batch by extracting content features from hidden vgg19 CNN layer.
+        :param image_batch: Image data batch in (x,y,z,3) RGB format
+        :param input_shape: Single image's shape (y,z,3)
+        :param batch_size: Number of images that are processed at a time
+        :return: Gram matrices batch in (x,512,512,1) format
+        """
+        print("[INFO] Starting VGG19 Content Matrix Extraction")
+        if image_batch.shape[0] <= batch_size:
+            x = [image_batch]
+        else:
+            n_batches = math.ceil(image_batch.shape[0] / batch_size)
+            x = np.array_split(image_batch, n_batches)
 
         content_layers = ['block5_conv2']
 
         content_extractor = self._vgg_layers(content_layers, input_shape=input_shape)
-        content_outputs = content_extractor(x)
 
-        print(content_outputs.shape)
-        output = np.average(content_outputs[0], axis=2)
-        print(output.shape)
-        plt.imshow(output)
-        plt.show()
+        gram_outputs = []
+        for batch in x:
+            content_outputs = content_extractor(batch)
 
-        content_outputs = [self._gram_matrix(content_output)
-                           for content_output in content_outputs]
+            for content_out in content_outputs:
+                content_out = np.array([content_out])
+                gm = self._gram_matrix(content_out)
+                gram_outputs.append(np.asarray(gm[0]).reshape(gm[0].shape[0], gm[0].shape[1], 1))
 
-        ###############
-        # plots
-        '''
-        import matplotlib.pyplot as plt
-        for idx_layer, output in enumerate(content_outputs):
-            print(output.shape)
-            images_to_plot = []
-            indices = np.random.randint(0, output.shape[2], 16)
-            for idx in indices:
-                images_to_plot.append(output[:, :, idx])
-            fig = plt.figure(figsize=(6, 6))
-            columns = 4
-            rows = 4
-            for i in range(1, columns * rows + 1):
-                fig.add_subplot(rows, columns, i)
-                plt.imshow(images_to_plot[i - 1], cmap="gray")
-            plt.suptitle(str(content_layers[idx_layer]) + " Size: " + str(output[:, :, 0].shape) + " Number: " + str(output[0, 0, :].shape))
-            plt.show()
-        '''
-        ###############
+        print("[INFO] Finished VGG19 Content Matrix Extraction")
+        return np.asarray(gram_outputs)
 
-        return content_outputs
-
-    def get_style_vgg19(self, image, input_shape=(298, 224, 3), save_fig=True):
-        '''
-        print(image)
-        x = tf.image.resize(image, input_shape[:2])
-        print(x)
-        x = np.array([x])
-        '''
-        x = image
+    def get_style_vgg19(self, image_batch, input_shape=(298, 224, 3), batch_size=16):
+        """
+        Computes gram matrices for image batch by extracting stylistic features from hidden vgg19 CNN layer.
+        :param image_batch: Image data batch in (x,y,z,3) RGB format
+        :param input_shape: Single image's shape (y,z,3)
+        :param batch_size: Number of images that are processed at a time
+        :return: Gram matrices batch in (x,512,512,1) format
+        """
+        print("[INFO] Starting VGG19 Style Matrix Extraction")
+        if image_batch.shape[0] <= batch_size:
+            x = [image_batch]
+        else:
+            n_batches = math.ceil(image_batch.shape[0]/batch_size)
+            x = np.array_split(image_batch, n_batches)
 
         style_layers = ['block5_conv1']
 
         style_extractor = self._vgg_layers(style_layers, input_shape=input_shape)
-        style_outputs = style_extractor(x)
-        print(style_outputs.shape)
 
-        if save_fig:
-            for idx_layer, output in enumerate(style_outputs):
-                images_to_plot = []
-                indices = np.random.randint(0, output.shape[3], 9)
-                for idx in indices:
-                    images_to_plot.append(output[0, :, :, idx])
-                title = str(style_layers[idx_layer]) + " Size: " + str(output[0, :, :, 0].shape) + " Number: " + str(output[0, 0, 0, :].shape)
-                self._save_image(images_to_plot, title, cmap='viridis')
+        gram_outputs = []
+        for batch in x:
+            style_outputs = style_extractor(batch)
 
-        style_outputs = [self._gram_matrix(style_output)
-                         for style_output in style_outputs]
-        style_outputs = np.asarray(style_outputs)
-        print(style_outputs.shape)
+            for style_out in style_outputs:
+                style_out = np.array([style_out])
+                gm = self._gram_matrix(style_out)
+                gram_outputs.append(np.asarray(gm[0]).reshape(gm[0].shape[0], gm[0].shape[1], 1))
 
-        if save_fig:
-            for idx_layer, output in enumerate(style_outputs):
-                import matplotlib.pyplot as plt
-                plt.imshow(np.asarray(output[0]))
-                plt.title("Gram matrix for " + str(style_layers[idx_layer]))
-                plt.show()
-
-        return style_outputs
+        print("[INFO] Finished VGG19 Style Matrix Extraction")
+        return np.asarray(gram_outputs)
 
     def _vgg_layers(self, layer_names, input_shape=(298, 224, 3)):
         vgg = tf.keras.applications.VGG19(include_top=False, weights='imagenet', input_shape=input_shape)
@@ -122,7 +115,17 @@ class FeatureExtractor():
         num_locations = tf.cast(input_shape[1] * input_shape[2], tf.float32)
         return result / (num_locations)
 
-    def dictionary_learning(self, train_data, test_data, components=50, save_fig=True, save_model=True):
+    def dictionary_learning(self, train_data, test_data, components=100, save_fig=True, save_model=True):
+        """
+        Learns a dictionary from train data and applies it to train and test data.
+        :param train_data: Image batch in (x,y,z,1) grayscale format (train)
+        :param test_data: Image batch in (x,y,z,1) grayscale format (test)
+        :param components: Number of atoms in dictionary to be extracted
+        :param save_fig: If true 9 random components are plotted
+        :param save_model: If true fitted dictionary model is saved as pickle file
+        :return: returns transformed train and test data in (x,components) format
+        """
+        print("[INFO] Starting Dictionary Learning")
         height, width = train_data.shape[1], train_data.shape[2]
         train_data = train_data.reshape(train_data.shape[0], train_data.shape[1] * train_data.shape[2])
         test_data = test_data.reshape(test_data.shape[0], test_data.shape[1] * test_data.shape[2])
@@ -144,14 +147,29 @@ class FeatureExtractor():
             images_to_plot = images_to_plot.reshape(9, height, width)
             self._save_image(images_to_plot, "DL_components")
 
+        print("[INFO] Finished Dictionary Learning")
         return train_data_dl, test_data_dl
 
     def get_dictionary(self):
+        """
+        Function to return the learnt dictionary.
+        :return: sklearn fitted dictionary learning model
+        """
         with open(r"learning_output/dictionary_learning.pickle", "rb") as input_file:
             dict_results = pickle.load(input_file)
         return dict_results["model"]
 
-    def ICA(self, train_data, test_data, components=10, save_fig=True, save_model=True):
+    def ICA(self, train_data, test_data, components=50, save_fig=True, save_model=True):
+        """
+        Applies Independent Component Analysis on train data and fits test data on learnt model.
+        :param train_data: Image batch in (x,y,z,1) grayscale format (train)
+        :param test_data: Image batch in (x,y,z,1) grayscale format (test)
+        :param components: Number of model's components to learn
+        :param save_fig: If true 9 random components are plotted
+        :param save_model: If true ICA model is saved as pickle file
+        :return: returns transformed train and test data in (x,components) format
+        """
+        print("[INFO] Starting ICA")
         height, width = train_data.shape[1], train_data.shape[2]
         train_data = train_data.reshape(train_data.shape[0], train_data.shape[1] * train_data.shape[2])
         test_data = test_data.reshape(test_data.shape[0], test_data.shape[1] * test_data.shape[2])
@@ -173,9 +191,20 @@ class FeatureExtractor():
             images_to_plot = images_to_plot.reshape(9, height, width)
             self._save_image(images_to_plot, "ICA_components")
 
+        print("[INFO] Finished Dictionary Learning")
         return train_data_ica, test_data_ica
 
-    def PCA(self, train_data, test_data, components=10, save_fig=True, save_model=True):
+    def PCA(self, train_data, test_data, components=50, save_fig=True, save_model=True):
+        """
+        Applies Principal Components Analysis on train data and fits test data on learnt model.
+        :param train_data: Image batch in (x,y,z,1) grayscale format (train)
+        :param test_data: Image batch in (x,y,z,1) grayscale format (test)
+        :param components: Number of components to be kept during fitting process.
+        :param save_fig: If true 9 random components are plotted
+        :param save_model: If true PCA model is saved as pickle file
+        :return: returns transformed train and test data in (x,components) format
+        """
+        print("[INFO] Starting PCA")
         height, width = train_data.shape[1], train_data.shape[2]
         train_data = train_data.reshape(train_data.shape[0], train_data.shape[1] * train_data.shape[2])
         test_data = test_data.reshape(test_data.shape[0], test_data.shape[1] * test_data.shape[2])
@@ -197,9 +226,20 @@ class FeatureExtractor():
             images_to_plot = images_to_plot.reshape(9, height, width)
             self._save_image(images_to_plot, "PCA_components")
 
+        print("[INFO] Finished PCA")
         return train_data_pca, test_data_pca
 
-    def NMF(self, train_data, test_data, components=10, save_fig=True, save_model=True):
+    def NMF(self, train_data, test_data, components=50, save_fig=True, save_model=True):
+        """
+        Applies Non Negative Matrix Factorization on train data and fits test data on learnt model.
+        :param train_data: Image batch in (x,y,z,1) grayscale format (train)
+        :param test_data: Image batch in (x,y,z,1) grayscale format (test)
+        :param components: Matrix dimension (components) for learnt Matrices
+        :param save_fig: If true 9 random components are plotted
+        :param save_model: If true NMF model is saved as pickle file
+        :return: returns transformed train and test data in (x,components) format
+        """
+        print("[INFO] Starting NMF")
         height, width = train_data.shape[1], train_data.shape[2]
         train_data = train_data.reshape(train_data.shape[0], train_data.shape[1] * train_data.shape[2])
         test_data = test_data.reshape(test_data.shape[0], test_data.shape[1] * test_data.shape[2])
@@ -221,6 +261,7 @@ class FeatureExtractor():
             images_to_plot = images_to_plot.reshape(9, height, width)
             self._save_image(images_to_plot, "NMF_components")
 
+        print("[INFO] Finished NMF")
         return train_data_nmf, test_data_nmf
 
     def sobel_filter(self, train_data, test_data):
@@ -230,6 +271,7 @@ class FeatureExtractor():
         :param test_data: Image data batch in (x,y,z,1) GRAY format (test)
         :return: returns two np arrays for train/test batch with sobel filter output in shape (x, y, z, 1)
         """
+        print("[INFO] Starting Sobel Detection")
         dim_1 = train_data.shape[1]
         dim_2 = train_data.shape[2]
         train_data_out = np.zeros(train_data.shape)
@@ -252,6 +294,7 @@ class FeatureExtractor():
             mag *= 255.0 / np.max(mag)
             mag = mag.reshape(dim_1, dim_2, 1)
             test_data_out[idx] = mag
+        print("[INFO] Finished Sobel Detection")
         return train_data_out, test_data_out
 
     def color_histogram(self, train_data, test_data):
@@ -263,6 +306,7 @@ class FeatureExtractor():
 
         INFO: use plt.imshow(image, interpolation='nearest') to plot images for better results
         """
+        print("[INFO] Starting Color Histogram Computation")
         train_data = train_data.astype(np.uint8)
         test_data = test_data.astype(np.uint8)
         train_data_out = []
@@ -279,6 +323,7 @@ class FeatureExtractor():
             hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
             hist = cv2.calcHist([hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
             test_data_out.append(hist.reshape(180, 256, 1))
+        print("[INFO] Finished Color Histogram Computation")
         return np.asarray(train_data_out), np.asarray(test_data_out)
 
 
@@ -318,11 +363,11 @@ if __name__ == '__main__':
     data_loader = TrainTestData()
     salience_predictor = SaliencePrediction()
 
-    (X_train, Y_train), (X_test, Y_test) = data_loader.get_train_test_salience(gray=False)
-    (X_train, Y_train), (X_test, Y_test) = salience_predictor.scale_data(X_train, Y_train, X_test, Y_test, labels='regression')
+    (X_train, Y_train), (X_test, Y_test) = data_loader.get_train_test_salience(gray=True)
+    #(X_train, Y_train), (X_test, Y_test) = salience_predictor.scale_data(X_train, Y_train, X_test, Y_test, labels='regression')
 
-    style_output = feature_extractor.get_style_vgg19(X_test, save_fig=False)
-    #content_output = feature_extractor.get_content_vgg19(X_train[5], save_fig=False)
+    #style_output = feature_extractor.get_style_vgg19(X_test)
+    #content_output = feature_extractor.get_content_vgg19(X_test)
 
     '''
     image = X_train[5]
