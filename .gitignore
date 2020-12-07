@@ -8,3 +8,4 @@ output_images/
 plots/
 .ipynb_checkpoints/
 nn_models/
+main.ipynb

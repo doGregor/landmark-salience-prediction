@@ -39,7 +39,7 @@ class SaliencePrediction():
         return model
 
     def train_cnn_for_regression(self, model, train_data, train_labels, test_data, test_labels, epochs=10, batch_size=16,
-                                 save=False, evaluate=True):
+                                 save=False, evaluate=True, save_name='regression'):
         history = model.fit(train_data, train_labels, epochs=epochs,
                             validation_data=(test_data, test_labels),
                             batch_size=batch_size)
@@ -53,7 +53,8 @@ class SaliencePrediction():
             plt.legend(['train', 'val'], loc='upper left')
             axes = plt.gca()
             axes.set_ylim([0, 0.35])
-            plt.savefig('plots/loss_regression_cnn.png')
+            path = "plots/" + save_name + "_loss.png"
+            plt.savefig(path)
             plt.clf()
             
             plt.plot(history.history['mse'])
@@ -64,7 +65,8 @@ class SaliencePrediction():
             plt.legend(['train', 'val'], loc='upper left')
             axes = plt.gca()
             axes.set_ylim([0, 0.05])
-            plt.savefig('plots/mse_regression_cnn.png')
+            path = "plots/" + save_name + "_mse.png"
+            plt.savefig(path)
             plt.clf()
             
             plt.plot(history.history['mae'])
@@ -75,7 +77,8 @@ class SaliencePrediction():
             plt.legend(['train', 'val'], loc='upper left')
             axes = plt.gca()
             axes.set_ylim([0, 0.35])
-            plt.savefig('plots/mae_regression_cnn.png')
+            path = "plots/" + save_name + "_mae.png"
+            plt.savefig(path)
             plt.clf()
             
             plt.plot(history.history['mape'])
@@ -86,11 +89,13 @@ class SaliencePrediction():
             plt.legend(['train', 'val'], loc='upper left')
             axes = plt.gca()
             axes.set_ylim([0, 50])
-            plt.savefig('plots/mape_regression_cnn.png')
+            path = "plots/" + save_name + "_mape.png"
+            plt.savefig(path)
             plt.clf()
 
         if save:
-            model.save('nn_models/regression_cnn_images_directly.h5')
+            path = "nn_models/" + save_name + ".h5"
+            model.save(path)
             del model
 
     def predict(self, model_name, X_data):
@@ -104,8 +109,10 @@ class SaliencePrediction():
         model = tf.keras.models.Sequential()
         model.add(tf.keras.applications.VGG19(include_top=False, weights='imagenet', input_shape=image_shape))
         model.add(tf.keras.layers.Flatten())
-        model.add(tf.keras.layers.Dense(10000, activation="relu"))
-        model.add(tf.keras.layers.Dense(1, activation="sigmoid"))
+        model.add(tf.keras.layers.Dense(200, activation='relu'))
+        model.add(tf.keras.layers.Dropout(0.5))
+        model.add(tf.keras.layers.Dense(50, activation='relu'))
+        model.add(tf.keras.layers.Dense(2, activation="softmax"))
 
         opt = tf.keras.optimizers.SGD(lr=0.01, momentum=0.9)
         model.compile(loss="binary_crossentropy", optimizer=opt, metrics=['accuracy'])
@@ -113,29 +120,39 @@ class SaliencePrediction():
 
         return model
 
-    def train_cnn_for_classifiaction(self, model, train_data, train_labels, test_data, test_labels, epochs=10, batch_size=16, save=False):
+    def train_cnn_for_classifiaction(self, model, train_data, train_labels, test_data, test_labels, epochs=10,
+                                     batch_size=16, save=False, evaluate=False, save_name='classification'):
         history = model.fit(train_data, train_labels, validation_data=(test_data, test_labels),
                             epochs=epochs, batch_size=batch_size, verbose=1)
-        # evaluate the model
-        _, train_acc = model.evaluate(train_data, train_labels, verbose=1)
-        _, test_acc = model.evaluate(test_data, test_labels, verbose=1)
-        print('Train: %.3f, Test: %.3f' % (train_acc, test_acc))
-        # plot loss during training
-        plt.subplot(211)
-        plt.title('Loss')
-        plt.plot(history.history['loss'], label='train')
-        plt.plot(history.history['val_loss'], label='test')
-        plt.legend()
-        # plot accuracy during training
-        plt.subplot(212)
-        plt.title('Accuracy')
-        plt.plot(history.history['accuracy'], label='train')
-        plt.plot(history.history['val_accuracy'], label='test')
-        plt.legend()
-        plt.savefig('plots/classification_cnn.png')
+
+        if evaluate:
+            plt.plot(history.history['loss'])
+            plt.plot(history.history['val_loss'])
+            plt.title('model loss')
+            plt.ylabel('loss')
+            plt.xlabel('epoch')
+            plt.legend(['train', 'val'], loc='upper left')
+            #axes = plt.gca()
+            #axes.set_ylim([0, 0.35])
+            path = "plots/" + save_name + "_loss.png"
+            plt.savefig(path)
+            plt.clf()
+
+            plt.plot(history.history['accuracy'])
+            plt.plot(history.history['val_accuracy'])
+            plt.title('model accuracy')
+            plt.ylabel('accuracy')
+            plt.xlabel('epoch')
+            plt.legend(['train', 'val'], loc='upper left')
+            # axes = plt.gca()
+            # axes.set_ylim([0, 0.35])
+            path = "plots/" + save_name + "_accuracy.png"
+            plt.savefig(path)
+            plt.clf()
 
         if save:
-            model.save('nn_models/classification_cnn_images_directly.h5')
+            path = "nn_models/" + save_name + ".h5"
+            model.save(path)
             del model
 
 
