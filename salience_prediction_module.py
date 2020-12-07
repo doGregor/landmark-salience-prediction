@@ -2,6 +2,9 @@ import tensorflow as tf
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
+from collections import Counter, OrderedDict
+import math
+from sklearn.utils.class_weight import compute_class_weight
 
 
 class SaliencePrediction():
@@ -12,28 +15,46 @@ class SaliencePrediction():
         if labels == 'regression':
             train_labels, test_labels = train_labels / 5.0, test_labels / 5.0
         elif labels == 'classification':
+            '''
             b_train = np.zeros((train_labels.size, train_labels.max()+1))
             b_train[np.arange(train_labels.size), train_labels] = 1
             b_test = np.zeros((test_labels.size, test_labels.max()+1))
             b_test[np.arange(test_labels.size), test_labels] = 1
             train_labels = b_train
             test_labels = b_test
+            '''
+            train_labels = train_labels
+            test_labels = test_labels
         else:
             print("Wrong parameter for data preprocessing:", sys.exc_info()[0])
         train_data, test_data = train_data / 255.0, test_data / 255.0
         return (train_data, train_labels), (test_data, test_labels)
+    
+    def create_class_weight(self, labels_list):
+        labels_dict = dict(Counter(labels_list))
+        sortDic = sorted(labels_dict.items())
+        labels_dict = dict(sortDic)
+        keys = list(labels_dict.keys())
+        
+        class_weight = compute_class_weight(class_weight='balanced', classes=keys, y=labels_list)
+        class_weight = dict(enumerate(class_weight))
+
+        return class_weight
 
     def initialize_cnn_for_regression(self, image_shape=(298, 224, 3)):
         #lrelu = lambda x: tf.keras.activations.relu(x, alpha=0.1)
         model = tf.keras.models.Sequential()
         model.add(tf.keras.applications.VGG19(include_top=False, weights='imagenet', input_shape=image_shape))
         model.add(tf.keras.layers.Flatten())
-        model.add(tf.keras.layers.Dense(200, activation='relu'))
-        model.add(tf.keras.layers.Dropout(0.5))
-        model.add(tf.keras.layers.Dense(50, activation='relu'))
+        #model.add(tf.keras.layers.Dense(200, activation='relu'))
+        #model.add(tf.keras.layers.Dropout(0.5))
+        #model.add(tf.keras.layers.Dense(50, activation='relu'))
+        model.add(tf.keras.layers.Dense(4096, activation='relu'))
+        model.add(tf.keras.layers.Dense(2048, activation='relu'))
         model.add(tf.keras.layers.Dense(1, activation="linear"))
 
-        model.compile(loss='mean_absolute_error', optimizer='adam', metrics=['mse', 'mae', 'mape'])
+        opt = tf.keras.optimizers.SGD(lr=0.001)
+        model.compile(loss='mean_absolute_error', optimizer=opt, metrics=['mse', 'mae', 'mape'])
         model.summary()
 
         return model
@@ -109,21 +130,25 @@ class SaliencePrediction():
         model = tf.keras.models.Sequential()
         model.add(tf.keras.applications.VGG19(include_top=False, weights='imagenet', input_shape=image_shape))
         model.add(tf.keras.layers.Flatten())
-        model.add(tf.keras.layers.Dense(200, activation='relu'))
-        model.add(tf.keras.layers.Dropout(0.5))
-        model.add(tf.keras.layers.Dense(50, activation='relu'))
-        model.add(tf.keras.layers.Dense(2, activation="softmax"))
+        #model.add(tf.keras.layers.Dense(200, activation='relu'))
+        #model.add(tf.keras.layers.Dropout(0.5))
+        #model.add(tf.keras.layers.Dense(50, activation='relu'))
+        model.add(tf.keras.layers.Dense(4096, activation='relu'))
+        model.add(tf.keras.layers.Dense(2048, activation='relu'))
+        #model.add(tf.keras.layers.Dense(2, activation="softmax"))
+        model.add(tf.keras.layers.Dense(1, activation='sigmoid'))
 
-        opt = tf.keras.optimizers.SGD(lr=0.01, momentum=0.9)
-        model.compile(loss="binary_crossentropy", optimizer=opt, metrics=['accuracy'])
+        opt = tf.keras.optimizers.SGD(lr=0.001)
+        loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+        model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
         model.summary()
 
         return model
 
     def train_cnn_for_classifiaction(self, model, train_data, train_labels, test_data, test_labels, epochs=10,
-                                     batch_size=16, save=False, evaluate=False, save_name='classification'):
+                                     class_weights=None, batch_size=16, save=False, evaluate=False, save_name='classification'):
         history = model.fit(train_data, train_labels, validation_data=(test_data, test_labels),
-                            epochs=epochs, batch_size=batch_size, verbose=1)
+                            epochs=epochs, batch_size=batch_size, class_weight=class_weights, verbose=1)
 
         if evaluate:
             plt.plot(history.history['loss'])
