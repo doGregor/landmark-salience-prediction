@@ -24,14 +24,16 @@ class SaliencePrediction():
         return (train_data, train_labels), (test_data, test_labels)
 
     def initialize_cnn_for_regression(self, image_shape=(298, 224, 3)):
+        #lrelu = lambda x: tf.keras.activations.relu(x, alpha=0.1)
         model = tf.keras.models.Sequential()
         model.add(tf.keras.applications.VGG19(include_top=False, weights='imagenet', input_shape=image_shape))
         model.add(tf.keras.layers.Flatten())
+        model.add(tf.keras.layers.Dense(200, activation='relu'))
         model.add(tf.keras.layers.Dropout(0.5))
-        model.add(tf.keras.layers.Dense(200, activation="relu"))
+        model.add(tf.keras.layers.Dense(50, activation='relu'))
         model.add(tf.keras.layers.Dense(1, activation="linear"))
 
-        model.compile(loss="mean_squared_error", optimizer='adam', metrics=['mse', 'mae', 'mape'])
+        model.compile(loss='mean_absolute_error', optimizer='adam', metrics=['mse', 'mae', 'mape'])
         model.summary()
 
         return model
@@ -50,7 +52,7 @@ class SaliencePrediction():
             plt.xlabel('epoch')
             plt.legend(['train', 'val'], loc='upper left')
             axes = plt.gca()
-            axes.set_ylim([0, 0.05])
+            axes.set_ylim([0, 0.35])
             plt.savefig('plots/loss_regression_cnn.png')
             plt.clf()
             
@@ -72,7 +74,7 @@ class SaliencePrediction():
             plt.xlabel('epoch')
             plt.legend(['train', 'val'], loc='upper left')
             axes = plt.gca()
-            axes.set_ylim([0, 0.2])
+            axes.set_ylim([0, 0.35])
             plt.savefig('plots/mae_regression_cnn.png')
             plt.clf()
             
@@ -83,7 +85,7 @@ class SaliencePrediction():
             plt.xlabel('epoch')
             plt.legend(['train', 'val'], loc='upper left')
             axes = plt.gca()
-            axes.set_ylim([0, 40])
+            axes.set_ylim([0, 50])
             plt.savefig('plots/mape_regression_cnn.png')
             plt.clf()
 
