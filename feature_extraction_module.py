@@ -4,13 +4,11 @@ import tensorflow as tf
 import math
 import matplotlib.pyplot as plt
 import pickle
-from sklearn.decomposition import NMF
-from sklearn.decomposition import PCA
-from sklearn.decomposition import FastICA
-from sklearn.decomposition import MiniBatchDictionaryLearning
+from sklearn.decomposition import NMF, PCA, FastICA, MiniBatchDictionaryLearning
 import datetime
 from scipy import ndimage
 import cv2
+import sys
 
 
 class FeatureExtractor():
@@ -264,67 +262,95 @@ class FeatureExtractor():
         print("[INFO] Finished NMF")
         return train_data_nmf, test_data_nmf
 
-    def sobel_filter(self, train_data, test_data):
+    def sobel_filter(self, image_batch):
         """
-        Applies sobel edge computation on train/test data image batches.
-        :param train_data: Image data batch in (x,y,z,1) GRAY format (train)
-        :param test_data: Image data batch in (x,y,z,1) GRAY format (test)
-        :return: returns two np arrays for train/test batch with sobel filter output in shape (x, y, z, 1)
+        Applies sobel edge computation on data image batches.
+        :param image_batch: Image data batch in (x,y,z,1) GRAY format
+        :return: returns a np arrays for input image batch with sobel filter output in shape (x, y, z, 1)
         """
         print("[INFO] Starting Sobel Detection")
-        dim_1 = train_data.shape[1]
-        dim_2 = train_data.shape[2]
-        train_data_out = np.zeros(train_data.shape)
-        test_data_out = np.zeros(test_data.shape)
-        for idx in range(train_data.shape[0]):
-            image = train_data[idx][:, :, 0]
+        dim_1 = image_batch.shape[1]
+        dim_2 = image_batch.shape[2]
+        data_out = np.zeros(image_batch.shape)
+        for idx in range(image_batch.shape[0]):
+            image = image_batch[idx][:, :, 0]
             im = image.astype('int32')
             dx = ndimage.sobel(im, 0)
             dy = ndimage.sobel(im, 1)
             mag = np.hypot(dx, dy)
             mag *= 255.0 / np.max(mag)
             mag = mag.reshape(dim_1, dim_2, 1)
-            train_data_out[idx] = mag
-        for idx in range(test_data.shape[0]):
-            image = test_data[idx][:, :, 0]
-            im = image.astype('int32')
-            dx = ndimage.sobel(im, 0)
-            dy = ndimage.sobel(im, 1)
-            mag = np.hypot(dx, dy)
-            mag *= 255.0 / np.max(mag)
-            mag = mag.reshape(dim_1, dim_2, 1)
-            test_data_out[idx] = mag
+            data_out[idx] = mag
         print("[INFO] Finished Sobel Detection")
-        return train_data_out, test_data_out
+        return data_out
 
-    def color_histogram(self, train_data, test_data):
+    def color_histogram(self, image_batch):
         """
-        Applies color histogram computation on train/test data image batches.
-        :param train_data: Image data batch in (x,y,z,3) RGB format (train)
-        :param test_data: Image data batch in (x,y,z,3) RGB format (test)
-        :return: returns two np arrays for train/test batch with color histograms in shape (x, 180, 256, 1)
+        Applies color histogram computation on data image batches.
+        :param image_batch: Image data batch in (x,y,z,3) RGB format
+        :return: returns a np array for input image batch with color histograms in shape (x, 180, 256, 1)
 
         INFO: use plt.imshow(image, interpolation='nearest') to plot images for better results
         """
         print("[INFO] Starting Color Histogram Computation")
-        train_data = train_data.astype(np.uint8)
-        test_data = test_data.astype(np.uint8)
-        train_data_out = []
-        test_data_out = []
-        for idx in range(train_data.shape[0]):
-            image = train_data[idx]
+        input_data = image_batch.astype(np.uint8)
+        data_out = []
+        for idx in range(input_data.shape[0]):
+            image = input_data[idx]
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
             hist = cv2.calcHist([hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
-            train_data_out.append(hist.reshape(180, 256, 1))
-        for idx in range(test_data.shape[0]):
-            image = test_data[idx]
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-            hist = cv2.calcHist([hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
-            test_data_out.append(hist.reshape(180, 256, 1))
+            data_out.append(hist.reshape(180, 256, 1))
         print("[INFO] Finished Color Histogram Computation")
-        return np.asarray(train_data_out), np.asarray(test_data_out)
+        return np.asarray(data_out)
+
+    def brightness(self, image_batch, mode='avg'):
+        """
+        Computes brightness values for image batch.
+        :param image_batch: Image data batch in (x,y,z,1) GRAY format
+        :param mode: how detailed brightness should be computed : 'avg' or 'detailed'
+        :return: Batch with brightness values in (x,y)[detailed] or (x)[avg] format
+        """
+        print("[INFO] Starting Brightness Computation")
+        data_out = []
+        for idx in range(image_batch.shape[0]):
+            image = image_batch[idx][:, :, 0]
+            if mode == 'avg':
+                data_out.append(np.average(image))
+            elif mode == 'detailed':
+                data_out.append(np.average(image, axis=1))
+            else:
+                print("Wrong parameter for data preprocessing:", sys.exc_info()[0])
+        print("[INFO] Finished Brightness Computation")
+        return np.asarray(data_out)
+
+    def contrast(self, image_batch, mode='avg'):
+        """
+        Computes contrast values for image batch.
+        :param image_batch: Image data batch in (x,y,z,3) RGB format
+        :param mode: how detailed contrast should be computed: 'avg' or 'detailed'
+        :return: Batch with brightness values in (x,y,3)[detailed] or (x,3)[avg] format
+        """
+        print("[INFO] Starting Contrast Computation")
+        data_out = []
+        for idx in range(image_batch.shape[0]):
+            image_R = image_batch[idx][:, :, 0]
+            image_G = image_batch[idx][:, :, 1]
+            image_B = image_batch[idx][:, :, 2]
+            if mode == 'avg':
+                R = np.max(image_R) - np.min(image_R)
+                G = np.max(image_G) - np.min(image_G)
+                B = np.max(image_B) - np.min(image_B)
+                data_out.append([R, G, B])
+            elif mode == 'detailed':
+                R = np.max(image_R, axis=1) - np.min(image_R, axis=1)
+                G = np.max(image_G, axis=1) - np.min(image_G, axis=1)
+                B = np.max(image_B, axis=1) - np.min(image_B, axis=1)
+                data_out.append(np.stack((R, G, B), axis=1))
+            else:
+                print("Wrong parameter for data preprocessing:", sys.exc_info()[0])
+        print("[INFO] Finished Contrast Computation")
+        return np.asarray(data_out)
 
 
 if __name__ == '__main__':
@@ -363,8 +389,11 @@ if __name__ == '__main__':
     data_loader = TrainTestData()
     salience_predictor = SaliencePrediction()
 
-    (X_train, Y_train), (X_test, Y_test) = data_loader.get_train_test_salience(gray=True)
+    (X_train, Y_train), (X_test, Y_test) = data_loader.get_train_test_salience(gray=False)
     #(X_train, Y_train), (X_test, Y_test) = salience_predictor.scale_data(X_train, Y_train, X_test, Y_test, labels='regression')
+
+    contrast = feature_extractor.contrast(X_test, mode='detailed')
+    print(contrast.shape)
 
     #style_output = feature_extractor.get_style_vgg19(X_test)
     #content_output = feature_extractor.get_content_vgg19(X_test)
