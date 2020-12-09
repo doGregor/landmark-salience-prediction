@@ -320,7 +320,7 @@ class FeatureExtractor():
             elif mode == 'detailed':
                 data_out.append(np.average(image, axis=1))
             else:
-                print("Wrong parameter for data preprocessing:", sys.exc_info()[0])
+                sys.exit("Wrong parameter for data preprocessing")
         print("[INFO] Finished Brightness Computation")
         return np.asarray(data_out)
 
@@ -348,7 +348,7 @@ class FeatureExtractor():
                 B = np.max(image_B, axis=1) - np.min(image_B, axis=1)
                 data_out.append(np.stack((R, G, B), axis=1))
             else:
-                print("Wrong parameter for data preprocessing:", sys.exc_info()[0])
+                sys.exit("Wrong parameter for data preprocessing")
         print("[INFO] Finished Contrast Computation")
         return np.asarray(data_out)
 

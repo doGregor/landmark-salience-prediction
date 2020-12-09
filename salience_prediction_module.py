@@ -26,7 +26,7 @@ class SaliencePrediction():
             train_labels = train_labels
             test_labels = test_labels
         else:
-            print("Wrong parameter for data preprocessing:", sys.exc_info()[0])
+            sys.exit("Wrong parameter for data preprocessing")
         train_data, test_data = train_data / 255.0, test_data / 255.0
         return (train_data, train_labels), (test_data, test_labels)
     
