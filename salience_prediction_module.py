@@ -41,7 +41,7 @@ class SaliencePrediction():
 
         return class_weight
 
-    def initialize_cnn_for_regression(self, image_shape=(298, 224, 3)):
+    def initialize_cnn_for_regression(self, summary=False, image_shape=(298, 224, 3)):
         #lrelu = lambda x: tf.keras.activations.relu(x, alpha=0.1)
         model = tf.keras.models.Sequential()
         model.add(tf.keras.applications.VGG19(include_top=False, weights='imagenet', input_shape=image_shape))
@@ -55,17 +55,25 @@ class SaliencePrediction():
 
         opt = tf.keras.optimizers.SGD(lr=0.001)
         model.compile(loss='mean_absolute_error', optimizer=opt, metrics=['mse', 'mae', 'mape'])
-        model.summary()
+        
+        if summary:
+            model.summary()
 
         return model
 
     def train_cnn_for_regression(self, model, train_data, train_labels, test_data, test_labels, epochs=10, batch_size=16,
-                                 save=False, evaluate=True, save_name='regression'):
+                                 save=False, evaluate=True, save_name='regression', verbose=1, delete=True):
         history = model.fit(train_data, train_labels, epochs=epochs,
                             validation_data=(test_data, test_labels),
-                            batch_size=batch_size)
+                            batch_size=batch_size, verbose=verbose)
 
         if evaluate:
+            results_train_evaluation = model.evaluate(train_data, train_labels, batch_size=batch_size)
+            print("train loss, train acc:", results_train_evaluation)
+            
+            results_test_evaluation = model.evaluate(test_data, test_labels, batch_size=batch_size)
+            print("test loss, test acc:", results_test_evaluation)
+            
             plt.plot(history.history['loss'])
             plt.plot(history.history['val_loss'])
             plt.title('model loss')
@@ -118,6 +126,9 @@ class SaliencePrediction():
             path = "nn_models/" + save_name + ".h5"
             model.save(path)
             del model
+        
+        if delete:
+            del model
 
     def predict(self, model_name, X_data):
         model_path = "nn_models/" + model_name + ".h5"
@@ -126,7 +137,7 @@ class SaliencePrediction():
         predictions = model.predict(X_data)
         return predictions
 
-    def initialize_cnn_for_classification(self, image_shape=(298, 224, 3)):
+    def initialize_cnn_for_classification(self, summary=False, image_shape=(298, 224, 3)):
         model = tf.keras.models.Sequential()
         model.add(tf.keras.applications.VGG19(include_top=False, weights='imagenet', input_shape=image_shape))
         model.add(tf.keras.layers.Flatten())
@@ -141,16 +152,24 @@ class SaliencePrediction():
         opt = tf.keras.optimizers.SGD(lr=0.001)
         loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
-        model.summary()
+        
+        if summary:
+            model.summary()
 
         return model
 
-    def train_cnn_for_classifiaction(self, model, train_data, train_labels, test_data, test_labels, epochs=10,
-                                     class_weights=None, batch_size=16, save=False, evaluate=False, save_name='classification'):
+    def train_cnn_for_classification(self, model, train_data, train_labels, test_data, test_labels, epochs=10,
+                                     class_weights=None, batch_size=16, save=False, evaluate=False, save_name='classification', verbose=1, delete=True):
         history = model.fit(train_data, train_labels, validation_data=(test_data, test_labels),
-                            epochs=epochs, batch_size=batch_size, class_weight=class_weights, verbose=1)
+                            epochs=epochs, batch_size=batch_size, class_weight=class_weights, verbose=verbose)
 
         if evaluate:
+            results_train_evaluation = model.evaluate(train_data, train_labels, batch_size=batch_size)
+            print("train loss, train acc:", results_train_evaluation)
+            
+            results_test_evaluation = model.evaluate(test_data, test_labels, batch_size=batch_size)
+            print("test loss, test acc:", results_test_evaluation)
+            
             plt.plot(history.history['loss'])
             plt.plot(history.history['val_loss'])
             plt.title('model loss')
@@ -178,6 +197,9 @@ class SaliencePrediction():
         if save:
             path = "nn_models/" + save_name + ".h5"
             model.save(path)
+            del model
+            
+        if delete:
             del model
 
 
