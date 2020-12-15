@@ -6,6 +6,8 @@ import tensorflow.keras as keras
 import pickle
 from pathlib import Path
 import sys
+from random import shuffle
+import itertools
 
 
 class TrainTestData():
@@ -27,24 +29,20 @@ class TrainTestData():
         else:
             sys.exit("Selected cross validation split does not exist")
 
-    def split_images(self, train=0.7, split_name='train_test'):
+    def cv_split_images(self, folds=5, salience_threshold=3.5):
         """
-        Call this function to create a new train/test split e.g. for cross validation.
-        :param train: fraction of train data
-        :param split_name: name of the saved pickle file
+        Call this function to create x-fold train/test cross-validation splits.
+        :param folds: number of cross-validation folds
+        :param salience_threshold: Salience value at which samples should be split in (1)/(0) for binary labels
         :return: returns nothing
         """
-        train_test_split = {}
         image_data = []
-        salience_data = []
-        binary_salience_data = []
 
         for idx, image_id in enumerate(self.id_column):
             image_numbers = []
             for value_images in range(1, 4):
                 image_number = str(image_id) + "." + str(value_images) + ".jpeg"
                 image_numbers.append(image_number)
-
             all_in = True
             files_available = os.listdir(self.lm_images_source)
             for image_number in image_numbers:
@@ -52,40 +50,74 @@ class TrainTestData():
                     pass
                 else:
                     all_in = False
-
             if all_in:
-                for im_no in image_numbers:
-                    image_data.append(im_no)
-                    salience_data.append(self.salience_column[idx])
-                    if self.salience_column[idx] <= 2.5:
-                        binary_salience_data.append(0)
-                    else:
-                        binary_salience_data.append(1)
+                image_data.append(image_id)
 
-        num_data = len(image_data)
-        max_train = int(num_data*train)
-        indices = np.arange(int(num_data))
-        np.random.shuffle(indices)
-        train_split = indices[:max_train]
-        test_split = indices[max_train:]
+        fold_size = int(len(image_data)/folds)
+        shuffle(image_data)
 
-        train_images = [image_data[i] for i in train_split]
-        test_images = [image_data[i] for i in test_split]
-        train_salience = [salience_data[i] for i in train_split]
-        test_salience = [salience_data[i] for i in test_split]
-        train_binary = [binary_salience_data[i] for i in train_split]
-        test_binary = [binary_salience_data[i] for i in test_split]
+        splits = []
+        for idx_set in range(0, folds):
+            idx_0 = idx_set * fold_size
+            if idx_set == folds - 1:
+                splits.append(image_data[idx_0:])
+            else:
+                idx_1 = (idx_set + 1) * fold_size
+                splits.append(image_data[idx_0:idx_1])
 
-        train_test_split["train_images"] = train_images
-        train_test_split["test_images"] = test_images
-        train_test_split["train_salience"] = train_salience
-        train_test_split["test_salience"] = test_salience
-        train_test_split["train_binary"] = train_binary
-        train_test_split["test_binary"] = test_binary
+        for idx_split, split in enumerate(splits):
+            train_test_split = {}
+            test = split
+            train = [x for i, x in enumerate(splits) if i != idx_split]
+            train = list(itertools.chain.from_iterable(train))
 
-        file_path = "train_test_data/cv_" + split_name + ".pickle"
-        with open(file_path, "wb") as output_file:
-            pickle.dump(train_test_split, output_file)
+            train_images = []
+            test_images = []
+            train_salience = []
+            test_salience = []
+            train_binary = []
+            test_binary = []
+            for im_no in test:
+                for val_im in range(1, 4):
+                    image_number = str(im_no) + "." + str(val_im) + ".jpeg"
+                    test_images.append(image_number)
+            shuffle(test_images)
+
+            for im_no in train:
+                for val_im in range(1, 4):
+                    image_number = str(im_no) + "." + str(val_im) + ".jpeg"
+                    train_images.append(image_number)
+            shuffle(train_images)
+
+            for im_no in train_images:
+                salience_idx = '.'.join(im_no.split('.')[:2])
+                salience_key = np.where(self.id_column == salience_idx)[0]
+                train_salience.append(float(self.salience_column[salience_key]))
+                if float(self.salience_column[salience_key]) <= salience_threshold:
+                    train_binary.append(0)
+                else:
+                    train_binary.append(1)
+
+            for im_no in test_images:
+                salience_idx = '.'.join(im_no.split('.')[:2])
+                salience_key = np.where(self.id_column == salience_idx)[0]
+                test_salience.append(float(self.salience_column[salience_key]))
+                if float(self.salience_column[salience_key]) <= salience_threshold:
+                    test_binary.append(0)
+                else:
+                    test_binary.append(1)
+
+            train_test_split["train_images"] = train_images
+            train_test_split["test_images"] = test_images
+            train_test_split["train_salience"] = train_salience
+            train_test_split["test_salience"] = test_salience
+            train_test_split["train_binary"] = train_binary
+            train_test_split["test_binary"] = test_binary
+
+            file_path = "train_test_data/cv_" + str(idx_split) + ".pickle"
+            print("[INFO] Created split " + str(idx_split) + " at:", file_path)
+            with open(file_path, "wb") as output_file:
+                pickle.dump(train_test_split, output_file)
 
     def get_train_test_salience(self, cv_name="0", im_target_size=(298, 224), gray=False):
         """
