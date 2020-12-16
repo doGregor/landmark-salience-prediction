@@ -29,7 +29,7 @@ class TrainTestData():
         else:
             sys.exit("Selected cross validation split does not exist")
 
-    def cv_split_images(self, folds=5, salience_threshold=3.5):
+    def cv_split_images(self, folds=5, salience_threshold=2.8):
         """
         Call this function to create x-fold train/test cross-validation splits.
         :param folds: number of cross-validation folds
