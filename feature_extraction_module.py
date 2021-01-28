@@ -38,6 +38,20 @@ class FeatureExtractor():
         fig_name = "plots/" + title + "_" + st + ".png"
         fig.savefig(fig_name)
 
+    def save_to_pickle(self, data, filename, folder='learning_output'):
+        """
+        Can be used to save any type of data in format of a dictionary to a pickle file.
+        :param data: Data to save; dictionary is recommended
+        :param filename: Name of the file to save
+        :param folder: Name of the folder where the file will be saved in
+        :return: Returns nothing
+        """
+        print("[INFO] Saving data to pickle")
+        path = folder + "/" + filename + ".pickle"
+        with open(path, "wb") as output_file:
+            pickle.dump(data, output_file)
+        print("[INFO] Finished data saving")
+
     def get_content_vgg19(self, image_batch, input_shape=(298, 224, 3), batch_size=16):
         """
         Computes gram matrices for image batch by extracting content features from hidden vgg19 CNN layer.
@@ -284,7 +298,26 @@ class FeatureExtractor():
         print("[INFO] Finished Sobel Detection")
         return data_out
 
-    def color_histogram(self, image_batch):
+    def SIFT_learning(self, image_batch, n_features=50):
+        """
+        Extraction of SIFT from images.
+        :param image_batch: Image data batch in (x,y,z,1) GRAY format
+        :param n_features: Number of keypoints to extract from each image
+        :return: returns np array with keypoints for each image in shape (x, VAR, 128)
+        [INFO: Number of extracted keypoints cannot be held constant]
+        """
+        print("[INFO] Staring SIFT extraction")
+        input_data = image_batch.astype(np.uint8)
+        sift = cv2.SIFT_create(nfeatures=n_features)
+        data_out = []
+        for idx in range(input_data.shape[0]):
+            image = input_data[idx]
+            kp, des = sift.detectAndCompute(image, None)
+            data_out.append(np.asarray(des))
+        print("[INFO] Finished SIFT extraction")
+        return np.asarray(data_out)
+
+    def color_histogram_2d(self, image_batch):
         """
         Applies color histogram computation on data image batches.
         :param image_batch: Image data batch in (x,y,z,3) RGB format
@@ -292,7 +325,7 @@ class FeatureExtractor():
 
         INFO: use plt.imshow(image, interpolation='nearest') to plot images for better results
         """
-        print("[INFO] Starting Color Histogram Computation")
+        print("[INFO] Starting Color Histogram 2d Computation")
         input_data = image_batch.astype(np.uint8)
         data_out = []
         for idx in range(input_data.shape[0]):
@@ -301,15 +334,72 @@ class FeatureExtractor():
             hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
             hist = cv2.calcHist([hsv], [0, 1], None, [180, 256], [0, 180, 0, 256])
             data_out.append(hist.reshape(180, 256, 1))
-        print("[INFO] Finished Color Histogram Computation")
+        print("[INFO] Finished Color Histogram 2d Computation")
         return np.asarray(data_out)
 
-    def brightness(self, image_batch, mode='avg'):
+    def color_histogram_1d(self, image_batch):
+        """
+        Computes 1d color histograms for RGB channels.
+        :param image_batch: Image data batch in (x,y,z,3) RGB format
+        :return: returns a np array for input image batch with color histograms in shape (x, 768)
+        [INFO: 768/n_channels=256]
+        """
+        print("[INFO] Starting Color Histogram 1d Computation")
+        input_data = image_batch.astype(np.uint8)
+        data_out = []
+        for idx in range(input_data.shape[0]):
+            image = input_data[idx]
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            single_hist = []
+            color = ('b', 'g', 'r')
+            for i, col in enumerate(color):
+                hist = cv2.calcHist([image], [i], None, [256], [0, 256])
+                single_hist = single_hist + list(hist.flatten())
+            data_out.append(single_hist)
+        print("[INFO] Finished Color Histogram 1d Computation")
+        return np.asarray(data_out)
+
+    def split_image_pattern(self, matrix, n_rows=6, n_cols=3):
+        """
+        Splits a matrix of size NxM into n_rows*n_cols patterns with height N/n_rows
+        and width M/n_cols
+        :param matrix: Matrix of size (NxM)
+        :param n_rows: number of rows for splitting
+        :param n_cols: number of columns for splitting
+        :return: List of extracted patterns
+        """
+        h, w = matrix.shape
+        block_width = int(w / n_cols)
+        block_height = int(h / n_rows)
+
+        blocks = []
+
+        for col_id in range(0, n_rows):
+            for row_id in range(0, n_cols):
+                if col_id < n_rows - 1 and row_id < n_cols - 1:
+                    curr_block = matrix[col_id * block_height:col_id * block_height + block_height,
+                                 row_id * block_width:row_id * block_width + block_width]
+                    blocks.append(curr_block)
+                elif col_id < n_rows - 1 and row_id == n_cols - 1:
+                    curr_block = matrix[col_id * block_height:col_id * block_height + block_height,
+                                 row_id * block_width:]
+                    blocks.append(curr_block)
+                elif col_id == n_rows - 1 and row_id < n_cols - 1:
+                    curr_block = matrix[col_id * block_height:, row_id * block_width:row_id * block_width + block_width]
+                    blocks.append(curr_block)
+                else:
+                    curr_block = matrix[col_id * block_height:, row_id * block_width:]
+                    blocks.append(curr_block)
+        return blocks
+
+    def brightness(self, image_batch, mode='avg', pattern_dim=(6, 3)):
         """
         Computes brightness values for image batch.
         :param image_batch: Image data batch in (x,y,z,1) GRAY format
-        :param mode: how detailed brightness should be computed : 'avg' or 'detailed'
-        :return: Batch with brightness values in (x,y)[detailed] or (x)[avg] format
+        :param mode: how detailed brightness should be computed : 'avg' or 'detailed' or 'pattern'
+        :param pattern_dim: (n_rows, n_columns) for pattern split
+        :return: Batch with brightness values in (x,y)[detailed] or (x)[avg] or
+        (x,patterns_dim[0]*patterns_dim[1])[pattern] format
         """
         print("[INFO] Starting Brightness Computation")
         data_out = []
@@ -319,17 +409,25 @@ class FeatureExtractor():
                 data_out.append(np.average(image))
             elif mode == 'detailed':
                 data_out.append(np.average(image, axis=1))
+            elif mode == 'pattern':
+                patterns = self.split_image_pattern(image, pattern_dim[0], pattern_dim[1])
+                pattern_brightness = []
+                for p in patterns:
+                    pattern_brightness.append(np.average(p))
+                data_out.append(pattern_brightness)
             else:
                 sys.exit("Wrong parameter for data preprocessing")
         print("[INFO] Finished Brightness Computation")
         return np.asarray(data_out)
 
-    def contrast(self, image_batch, mode='avg'):
+    def contrast(self, image_batch, mode='avg', pattern_dim=(6, 3)):
         """
         Computes contrast values for image batch.
         :param image_batch: Image data batch in (x,y,z,3) RGB format
-        :param mode: how detailed contrast should be computed: 'avg' or 'detailed'
-        :return: Batch with brightness values in (x,y,3)[detailed] or (x,3)[avg] format
+        :param mode: how detailed contrast should be computed: 'avg' or 'detailed' or 'pattern'
+        :param pattern_dim: (n_rows, n_columns) for pattern split
+        :return: Batch with brightness values in (x,y,3)[detailed] or (x,3)[avg] format or
+        (x,patterns_dim[0]*patterns_dim[1],3)[pattern] format
         """
         print("[INFO] Starting Contrast Computation")
         data_out = []
@@ -347,6 +445,17 @@ class FeatureExtractor():
                 G = np.max(image_G, axis=1) - np.min(image_G, axis=1)
                 B = np.max(image_B, axis=1) - np.min(image_B, axis=1)
                 data_out.append(np.stack((R, G, B), axis=1))
+            elif mode == 'pattern':
+                color_mode_results = []
+                for color_mode_image in [image_R, image_G, image_B]:
+                    patterns = self.split_image_pattern(color_mode_image, pattern_dim[0], pattern_dim[1])
+                    pattern_contrast = []
+                    for p in patterns:
+                        pattern_contrast.append(np.max(p) - np.min(p))
+                    color_mode_results.append(pattern_contrast)
+                color_mode_results = np.asarray(color_mode_results)
+                data_out.append(np.stack((color_mode_results[0], color_mode_results[1],
+                                          color_mode_results[2]), axis=1))
             else:
                 sys.exit("Wrong parameter for data preprocessing")
         print("[INFO] Finished Contrast Computation")
