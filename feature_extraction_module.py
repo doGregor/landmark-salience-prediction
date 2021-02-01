@@ -359,14 +359,14 @@ class FeatureExtractor():
         print("[INFO] Finished Color Histogram 1d Computation")
         return np.asarray(data_out)
 
-    def split_image_pattern(self, matrix, n_rows=6, n_cols=3):
+    def split_image_grid(self, matrix, n_rows=6, n_cols=3):
         """
-        Splits a matrix of size NxM into n_rows*n_cols patterns with height N/n_rows
+        Splits a matrix of size NxM into n_rows*n_cols grids with height N/n_rows
         and width M/n_cols
         :param matrix: Matrix of size (NxM)
         :param n_rows: number of rows for splitting
         :param n_cols: number of columns for splitting
-        :return: List of extracted patterns
+        :return: List of extracted grid fields
         """
         h, w = matrix.shape
         block_width = int(w / n_cols)
@@ -392,14 +392,14 @@ class FeatureExtractor():
                     blocks.append(curr_block)
         return blocks
 
-    def brightness(self, image_batch, mode='avg', pattern_dim=(6, 3)):
+    def brightness(self, image_batch, mode='avg', grid_dim=(6, 3)):
         """
         Computes brightness values for image batch.
         :param image_batch: Image data batch in (x,y,z,1) GRAY format
-        :param mode: how detailed brightness should be computed : 'avg' or 'detailed' or 'pattern'
-        :param pattern_dim: (n_rows, n_columns) for pattern split
+        :param mode: how detailed brightness should be computed : 'avg' or 'detailed' or 'grid'
+        :param grid_dim: (n_rows, n_columns) for grid split
         :return: Batch with brightness values in (x,y)[detailed] or (x)[avg] or
-        (x,patterns_dim[0]*patterns_dim[1])[pattern] format
+        (x,grid_dim[0]*grid_dim[1])[grid] format
         """
         print("[INFO] Starting Brightness Computation")
         data_out = []
@@ -409,25 +409,25 @@ class FeatureExtractor():
                 data_out.append(np.average(image))
             elif mode == 'detailed':
                 data_out.append(np.average(image, axis=1))
-            elif mode == 'pattern':
-                patterns = self.split_image_pattern(image, pattern_dim[0], pattern_dim[1])
-                pattern_brightness = []
-                for p in patterns:
-                    pattern_brightness.append(np.average(p))
-                data_out.append(pattern_brightness)
+            elif mode == 'grid':
+                grids = self.split_image_grid(image, grid_dim[0], grid_dim[1])
+                grids_brightness = []
+                for p in grids:
+                    grids_brightness.append(np.average(p))
+                data_out.append(grids_brightness)
             else:
                 sys.exit("Wrong parameter for data preprocessing")
         print("[INFO] Finished Brightness Computation")
         return np.asarray(data_out)
 
-    def contrast(self, image_batch, mode='avg', pattern_dim=(6, 3)):
+    def contrast(self, image_batch, mode='avg', grid_dim=(6, 3)):
         """
         Computes contrast values for image batch.
         :param image_batch: Image data batch in (x,y,z,3) RGB format
-        :param mode: how detailed contrast should be computed: 'avg' or 'detailed' or 'pattern'
-        :param pattern_dim: (n_rows, n_columns) for pattern split
+        :param mode: how detailed contrast should be computed: 'avg' or 'detailed' or 'grid'
+        :param grid_dim: (n_rows, n_columns) for grid split
         :return: Batch with brightness values in (x,y,3)[detailed] or (x,3)[avg] format or
-        (x,patterns_dim[0]*patterns_dim[1],3)[pattern] format
+        (x,grid_dim[0]*grid_dim[1],3)[grid] format
         """
         print("[INFO] Starting Contrast Computation")
         data_out = []
@@ -445,14 +445,14 @@ class FeatureExtractor():
                 G = np.max(image_G, axis=1) - np.min(image_G, axis=1)
                 B = np.max(image_B, axis=1) - np.min(image_B, axis=1)
                 data_out.append(np.stack((R, G, B), axis=1))
-            elif mode == 'pattern':
+            elif mode == 'grid':
                 color_mode_results = []
                 for color_mode_image in [image_R, image_G, image_B]:
-                    patterns = self.split_image_pattern(color_mode_image, pattern_dim[0], pattern_dim[1])
-                    pattern_contrast = []
-                    for p in patterns:
-                        pattern_contrast.append(np.max(p) - np.min(p))
-                    color_mode_results.append(pattern_contrast)
+                    grids = self.split_image_grid(color_mode_image, grid_dim[0], grid_dim[1])
+                    grids_contrast = []
+                    for p in grids:
+                        grids_contrast.append(np.max(p) - np.min(p))
+                    color_mode_results.append(grids_contrast)
                 color_mode_results = np.asarray(color_mode_results)
                 data_out.append(np.stack((color_mode_results[0], color_mode_results[1],
                                           color_mode_results[2]), axis=1))
