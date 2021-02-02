@@ -195,6 +195,31 @@ class TrainTestData():
         return (np.asarray(train_images_out), np.asarray(train_binary)),\
                (np.asarray(test_images_out), np.asarray(test_binary))
 
+    def get_raw_data(self, im_target_size=(298, 224), gray=False):
+        train_test_split = self.open_train_test_pickle(cv_name="0")
+        image_ids = train_test_split["train_images"] + train_test_split["test_images"]
+        binary_labels = train_test_split["train_binary"] + train_test_split["test_binary"]
+        salience_labels = train_test_split["train_salience"] + train_test_split["test_salience"]
+
+        images = []
+
+        for im_no in image_ids:
+            im_path = self.lm_images_source + "/" + im_no
+            if gray:
+                image = keras.preprocessing.image.load_img(im_path, target_size=im_target_size,
+                                                           color_mode='grayscale')
+            else:
+                image = keras.preprocessing.image.load_img(im_path, target_size=im_target_size)
+            images.append(keras.preprocessing.image.img_to_array(image))
+
+        output_dict = {}
+        output_dict['image_ids'] = image_ids
+        output_dict['images'] = images
+        output_dict['salience'] = salience_labels
+        output_dict['binary'] = binary_labels
+
+        return output_dict
+
 
 if __name__ == '__main__':
     data_class = TrainTestData()
