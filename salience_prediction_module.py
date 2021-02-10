@@ -109,7 +109,7 @@ class SaliencePrediction():
         plt.xlabel('epoch')
         plt.legend(['train', 'val'], loc='upper left')
         axes = plt.gca()
-        axes.set_ylim([0, 0.35])
+        #axes.set_ylim([0, 0.35])
         path = save_path + save_name + "_loss.png"
         plt.savefig(path)
         plt.clf()
@@ -121,7 +121,7 @@ class SaliencePrediction():
         plt.xlabel('epoch')
         plt.legend(['train', 'val'], loc='upper left')
         axes = plt.gca()
-        axes.set_ylim([0, 0.05])
+        #axes.set_ylim([0, 0.05])
         path = save_path + save_name + "_mse.png"
         plt.savefig(path)
         plt.clf()
@@ -133,7 +133,7 @@ class SaliencePrediction():
         plt.xlabel('epoch')
         plt.legend(['train', 'val'], loc='upper left')
         axes = plt.gca()
-        axes.set_ylim([0, 0.35])
+        #axes.set_ylim([0, 0.35])
         path = save_path + save_name + "_mae.png"
         plt.savefig(path)
         plt.clf()
@@ -145,7 +145,7 @@ class SaliencePrediction():
         plt.xlabel('epoch')
         plt.legend(['train', 'val'], loc='upper left')
         axes = plt.gca()
-        axes.set_ylim([0, 50])
+        #axes.set_ylim([0, 50])
         path = save_path + save_name + "_mape.png"
         plt.savefig(path)
         plt.clf()
@@ -182,18 +182,18 @@ class SaliencePrediction():
         plt.savefig(path)
         plt.clf()
 
-    def initialize_cnn_for_regression(self, model='vgg19', freeze=True, summary=False, image_shape=(298, 224, 3)):
+    def initialize_cnn_for_regression(self, model_name='vgg19', freeze=True, summary=False, image_shape=(298, 224, 3)):
         """
         Function to initialize a cnn with pre-trained base for regression transfer learning
-        :param model: pre trained base of the model (vgg19 or resnet152)
+        :param model_name: pre trained base of the model (vgg19 or resnet152)
         :param freeze: Whether weights of pre-trained layers should be trainable or not
         :param summary: Whether summary of initialized model should be displayed
         :param image_shape: Image shape for model input
         :return: returns the initialized model with pre-trained base
         """
-        if model == 'vgg19':
+        if model_name == 'vgg19':
             conv_base = tf.keras.applications.VGG19(include_top=False, weights='imagenet', input_shape=image_shape)
-        elif model == 'resnet152':
+        elif model_name == 'resnet152':
             conv_base = tf.keras.applications.ResNet152(include_top=False, weights='imagenet', input_shape=image_shape)
         else:
             sys.exit("Wrong parameter for model initialization")
@@ -207,8 +207,11 @@ class SaliencePrediction():
         model.add(tf.keras.layers.Dropout(0.5))
         model.add(tf.keras.layers.Dense(1, activation="linear"))
 
-        opt = tf.keras.optimizers.SGD(lr=0.001)
-        model.compile(loss='mean_absolute_error', optimizer=opt, metrics=['mse', 'mae', 'mape'])
+        #0.00001
+        model.compile(optimizer=tf.keras.optimizers.RMSprop(lr=0.00002),
+                      loss='mean_absolute_error',
+                      #loss='mean_squared_error',
+                      metrics=['mse', 'mae', 'mape'])
         
         if summary:
             model.summary()
@@ -216,7 +219,7 @@ class SaliencePrediction():
         return model
 
     def train_cnn_for_regression(self, model, train_data, train_labels, test_data, test_labels, epochs=10, batch_size=16,
-                                 save=False, evaluate=True, save_name='regression', verbose=1, delete=True):
+                                 save=False, evaluate=True, save_name='regression', verbose=1, delete=True, plot=False):
         """
         Training of previously initialized model for regression task
         :param model: Initialized model from func:initialize_cnn_for_regression
@@ -240,17 +243,17 @@ class SaliencePrediction():
 
         if evaluate:
             results_train_evaluation = model.evaluate(train_data, train_labels, batch_size=batch_size)
-            print("train loss, train acc:", results_train_evaluation)
+            print("train loss, train mse, train mae, train mape:", results_train_evaluation)
             
             results_test_evaluation = model.evaluate(test_data, test_labels, batch_size=batch_size)
-            print("test loss, test acc:", results_test_evaluation)
+            print("test loss, test mse, test mae, test mape:", results_test_evaluation)
             
+        if plot:
             self.regression_metrics_plots(history=history, save_name=save_name)
 
         if save:
             path = "nn_models/" + save_name + ".h5"
             model.save(path)
-            del model
         
         if delete:
             del model
@@ -262,39 +265,60 @@ class SaliencePrediction():
         predictions = model.predict(X_data)
         return predictions
 
-    def initialize_cnn_for_classification(self, model='vgg19', freeze=True, summary=False, image_shape=(298, 224, 3)):
+    def initialize_cnn_for_classification(self, model_name='vgg19', freeze=True, summary=False, image_shape=(298, 224, 3)):
         """
         Function to initialize a cnn with pre-trained base for classification transfer learning
-        :param model: pre trained base of the model (vgg19 or resnet152)
+        :param model_name: pre trained base of the model (vgg19 or resnet50)
         :param freeze: Whether weights of pre-trained layers should be trainable or not
         :param summary: Whether summary of initialized model should be displayed
         :param image_shape: Image shape for model input
         :return: returns the initialized model with pre-trained base
         """
-        if model == 'vgg19':
+        if model_name == 'vgg19':
             conv_base = tf.keras.applications.VGG19(include_top=False, weights='imagenet', input_shape=image_shape)
-        elif model == 'resnet152':
-            conv_base = tf.keras.applications.ResNet152(include_top=False, weights='imagenet', input_shape=image_shape)
+            
+            if freeze:
+                conv_base.trainable = False
+            
+            model = tf.keras.models.Sequential()
+            model.add(conv_base)
+            model.add(tf.keras.layers.Flatten())
+            model.add(tf.keras.layers.Dense(256, activation='relu'))
+            model.add(tf.keras.layers.Dropout(0.5))
+            model.add(tf.keras.layers.Dense(1, activation='sigmoid'))
+            
+            model.compile(optimizer=tf.keras.optimizers.RMSprop(lr=0.000005),
+                          loss='binary_crossentropy',
+                          metrics=['accuracy'])
+            
+        elif model_name == 'resnet50':
+            conv_base = tf.keras.applications.ResNet50(include_top=False, weights='imagenet', input_shape=image_shape)
+            
+            if freeze:
+                conv_base.trainable = False
+                
+            model = tf.keras.models.Sequential()
+            model.add(conv_base)
+            model.add(tf.keras.layers.Flatten())
+            model.add(tf.keras.layers.Dense(256, activation='relu'))
+            model.add(tf.keras.layers.Dropout(0.5))
+            #model.add(tf.keras.layers.Dense(256, activation='relu'))
+            model.add(tf.keras.layers.Dense(1, activation='sigmoid'))
+            
+            model.compile(optimizer=tf.keras.optimizers.RMSprop(lr=2e-5),
+                          loss='binary_crossentropy',
+                          metrics=['accuracy'])
+                
         else:
             sys.exit("Wrong parameter for model initialization")
-        if freeze:
-            conv_base.trainable = False
-        
-        model = tf.keras.models.Sequential()
-        model.add(conv_base)
-        model.add(tf.keras.layers.Flatten())
-        model.add(tf.keras.layers.Dense(256, activation='relu'))
-        model.add(tf.keras.layers.Dropout(0.5))
-        model.add(tf.keras.layers.Dense(1, activation='sigmoid'))
 
         '''
-        opt = tf.keras.optimizers.SGD(lr=0.0005)
-        loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+        #opt = tf.keras.optimizers.RMSprop(lr=0.000001)
+        #opt = tf.keras.optimizers.SGD(lr=0.01)
+        opt = tf.keras.optimizers.Adam(learning_rate=0.000001)
+        #loss = tf.keras.losses.BinaryCrossentropy(from_logits=True)
         model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
         '''
-        model.compile(optimizer=tf.keras.optimizers.RMSprop(lr=2e-5),
-                      loss='binary_crossentropy',
-                      metrics=['accuracy'])
         
         if summary:
             model.summary()
@@ -302,8 +326,8 @@ class SaliencePrediction():
         return model
 
     def train_cnn_for_classification(self, model, train_data, train_labels, test_data, test_labels, epochs=30,
-                                     class_weights=None, batch_size=16, save=False, evaluate=False,
-                                     save_name='classification', verbose=1, delete=True):
+                                     class_weights=None, batch_size=16, save=False, evaluate=False, early_stopping=True,
+                                     save_name='classification', verbose=1, delete=True, plot=False):
         """
         Training of previously initialized model for classification task
         :param model: Initialized model from func:initialize_cnn_for_classification
@@ -317,13 +341,19 @@ class SaliencePrediction():
         :param batch_size: Number of samples used for each step in each epoch
         :param save: Whether model should be saved to .h5 file
         :param evaluate: Whether model should be evaluated after training, saves plots of metrics
+        :param early_stopping: Whether early stopping should be used during training
         :param save_name: Name for saved .h5 file or/and metric plots
         :param verbose: Degree of information details for training process
         :param delete: Whether model should be deleted after evaluation (clear space in memory)
         :return: returns nothing
         """
-        history = model.fit(train_data, train_labels, validation_data=(test_data, test_labels),
-                            epochs=epochs, batch_size=batch_size, class_weight=class_weights, verbose=verbose)
+        if early_stopping:
+            es = tf.keras.callbacks.EarlyStopping(monitor='val_loss', mode='min', verbose=1, patience=5)
+            history = model.fit(train_data, train_labels, validation_data=(test_data, test_labels),
+                            epochs=epochs, batch_size=batch_size, class_weight=class_weights, verbose=verbose, callbacks=[es])
+        else:
+            history = model.fit(train_data, train_labels, validation_data=(test_data, test_labels),
+                                epochs=epochs, batch_size=batch_size, class_weight=class_weights, verbose=verbose)
 
         if evaluate:
             results_train_evaluation = model.evaluate(train_data, train_labels, batch_size=batch_size)
@@ -332,15 +362,38 @@ class SaliencePrediction():
             results_test_evaluation = model.evaluate(test_data, test_labels, batch_size=batch_size)
             print("test loss, test acc:", results_test_evaluation)
             
+        if plot:
             self.classification_metrics_plots(history=history, save_name=save_name)
 
         if save:
             path = "nn_models/" + save_name + ".h5"
             model.save(path)
-            del model
             
         if delete:
             del model
+            
+    def fine_tuning(self, model_name, image_shape=(298, 224, 3)):
+        model_path = "nn_models/" + model_name + ".h5"
+        model = tf.keras.models.load_model(model_path)
+        
+        conv_base = tf.keras.applications.VGG19(include_top=False, weights='imagenet', input_shape=image_shape)
+        
+        new_model = tf.keras.models.Sequential()
+        
+        n_layers_conv_base = len(conv_base.layers)
+        for layer_idx, layer in enumerate(conv_base.layers):
+            new_layer = conv_base.get_layer(layer.name)
+            if layer_idx < n_layers_conv_base-5:
+                new_layer.trainable=False
+            else:
+                new_layer.trainable=True
+            new_model.add(new_layer)
+        
+        for layer in model.layers[1:]:
+            new_layer = model.get_layer(layer.name)
+            new_model.add(new_layer)
+            
+        return new_model        
 
     def _mean_absolute_percentage_error(self, y_true, y_pred):
         """
