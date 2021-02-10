@@ -130,7 +130,6 @@ class TrainTestData():
         test_images = train_test_split["test_images"]
         
         return (train_images, test_images)
-        
 
     def get_train_test_salience(self, cv_name="0", im_target_size=(298, 224), gray=False):
         """
@@ -209,6 +208,12 @@ class TrainTestData():
                (np.asarray(test_images_out), np.asarray(test_binary))
 
     def get_raw_data(self, im_target_size=(298, 224), gray=False):
+        """
+        Get whole dataset without any validation split.
+        :param im_target_size: size of the images when loading them
+        :param gray: If images should be loaded gray-scales (True) or in RGB (False)
+        :return: Returns dict with keys: image_ids, images, salience, binary and values associated data as np array
+        """
         train_test_split = self.open_train_test_pickle(cv_name="0")
         image_ids = train_test_split["train_images"] + train_test_split["test_images"]
         binary_labels = train_test_split["train_binary"] + train_test_split["test_binary"]
