@@ -118,6 +118,19 @@ class TrainTestData():
             print("[INFO] Created split " + str(idx_split) + " at:", file_path)
             with open(file_path, "wb") as output_file:
                 pickle.dump(train_test_split, output_file)
+                
+    def get_train_test_image_ids(self, cv_name="0"):
+        """
+        Load image ids for train/test of specific data split.
+        :param cv_name: name of cross validation split (same as chosen in split_images())
+        :return: Returns a tuple where tuple[0] = train image ids and tuple[1] = test image ids
+        """
+        train_test_split = self.open_train_test_pickle(cv_name=cv_name)
+        train_images = train_test_split["train_images"]
+        test_images = train_test_split["test_images"]
+        
+        return (train_images, test_images)
+        
 
     def get_train_test_salience(self, cv_name="0", im_target_size=(298, 224), gray=False):
         """
