@@ -129,7 +129,31 @@ class TrainTestData():
         train_images = train_test_split["train_images"]
         test_images = train_test_split["test_images"]
         
-        return (train_images, test_images)
+        return (np.asarray(train_images), np.asarray(test_images))
+    
+    def get_salience_only(self, cv_name="0"):
+        """
+        Load salience values for train/test of specific data split.
+        :param cv_name: name of cross validation split (same as chosen in split_images())
+        :return: Returns a tuple where tuple[0] = train data salience values and tuple[1] = test data salience values
+        """
+        train_test_split = self.open_train_test_pickle(cv_name=cv_name)
+        train_salience = train_test_split["train_salience"]
+        test_salience = train_test_split["test_salience"]
+        
+        return (np.asarray(train_salience), np.asarray(test_salience))
+    
+    def get_binary_only(self, cv_name="0"):
+        """
+        Load binary labels for train/test of specific data split.
+        :param cv_name: name of cross validation split (same as chosen in split_images())
+        :return: Returns a tuple where tuple[0] = train data binary labels and tuple[1] = test data binary labels
+        """
+        train_test_split = self.open_train_test_pickle(cv_name=cv_name)
+        train_binary = train_test_split["train_binary"]
+        test_binary = train_test_split["test_binary"]
+        
+        return (np.asarray(train_binary), np.asarray(test_binary))
 
     def get_train_test_salience(self, cv_name="0", im_target_size=(298, 224), gray=False):
         """

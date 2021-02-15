@@ -280,7 +280,7 @@ class FeatureExtractor():
         """
         Applies sobel edge computation on data image batches.
         :param image_batch: Image data batch in (x,y,z,1) GRAY format
-        :return: returns a np arrays for input image batch with sobel filter output in shape (x, y, z, 1)
+        :return: returns np array for input image batch with sobel filter output in shape (x, y, z, 1)
         """
         print("[INFO] Starting Sobel Detection")
         dim_1 = image_batch.shape[1]
@@ -297,6 +297,35 @@ class FeatureExtractor():
             data_out[idx] = mag
         print("[INFO] Finished Sobel Detection")
         return data_out
+    
+    def complexity(self, image_batch, mode='avg', grid_dim=(6, 3)):
+        """
+        Computes complexity of an image.
+        :param image_batch: Image data batch in (x,y,z,1) GRAY format
+        :param mode: how detailed complexity should be computed : 'avg' or 'detailed' or 'grid'
+        :param grid_dim: (n_rows, n_columns) for grid split
+        :return: Batch with complexity values in (x,y)[detailed] or (x)[avg] or
+        (x,grid_dim[0]*grid_dim[1])[grid] format
+        """
+        print("[INFO] Starting Complexity Computation")
+        image_batch = self.sobel_filter(image_batch)
+        data_out = []
+        for idx in range(image_batch.shape[0]):
+            image = image_batch[idx][:, :, 0]
+            if mode == 'avg':
+                data_out.append(np.average(image))
+            elif mode == 'detailed':
+                data_out.append(np.average(image, axis=1))
+            elif mode == 'grid':
+                grids = self.split_image_grid(image, grid_dim[0], grid_dim[1])
+                grids_complexity = []
+                for p in grids:
+                    grids_complexity.append(np.average(p))
+                data_out.append(grids_complexity)
+            else:
+                sys.exit("Wrong parameter for data preprocessing")
+        print("[INFO] Finished Complexity Computation")
+        return np.asarray(data_out)
 
     def SIFT_learning(self, image_batch, n_features=50):
         """

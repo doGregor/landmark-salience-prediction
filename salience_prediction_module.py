@@ -6,7 +6,7 @@ from collections import Counter, OrderedDict
 import math
 from sklearn.utils.class_weight import compute_class_weight
 from sklearn.preprocessing import StandardScaler
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn import metrics
 
 
@@ -404,7 +404,7 @@ class SaliencePrediction():
         """
         return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
 
-    def feature_importance(self, X_train, Y_train, X_test, Y_test, n_estimators=250):
+    def feature_importance(self, X_train, Y_train, X_test, Y_test, n_estimators=200):
         """
         Estimates feature importance for extracted feature batches via random forest for regression
         :param X_train: Batch of train data features
@@ -414,11 +414,12 @@ class SaliencePrediction():
         :param n_estimators: number of trees in random forrest
         :return: returns dict with MAE, MSE and MAPE as keys and calculated metric as value
         """
+        print("[INFO] Starting Random Forest Fitting and Prediction")
         sc = StandardScaler()
         X_train = sc.fit_transform(X_train)
         X_test = sc.transform(X_test)
 
-        model = RandomForestRegressor(n_estimators=n_estimators, bootstrap=False, random_state=0)
+        model = RandomForestRegressor(n_estimators=n_estimators, criterion='mae', bootstrap=False, random_state=0)
         model.fit(X_train, Y_train)
 
         pred = model.predict(X_test)
@@ -427,6 +428,35 @@ class SaliencePrediction():
         results['MAE'] = metrics.mean_absolute_error(Y_test, pred)
         results['MSE'] = metrics.mean_squared_error(Y_test, pred)
         results['MAPE'] = self._mean_absolute_percentage_error(Y_test, pred)
+        print("[INFO] Finished Random Forest Fitting and Prediction")
+        
+        return results
+    
+    def feature_trend(self, X_train, Y_train, X_test, Y_test, n_estimators=200):
+        """
+        Estimates feature trend for extracted feature batches via random forest for classification
+        :param X_train: Batch of train data features
+        :param Y_train: Classification labels for train data
+        :param X_test: Batch of test data features
+        :param Y_test: Classification labels for test data
+        :param n_estimators: number of trees in random forrest
+        :return: returns dict with accuracy as keys and calculated metric as value
+        """
+        print("[INFO] Starting Random Forest Fitting and Prediction")
+        sc = StandardScaler()
+        X_train = sc.fit_transform(X_train)
+        X_test = sc.transform(X_test)
+
+        model = RandomForestClassifier(n_estimators=n_estimators, bootstrap=False, random_state=0)
+        model.fit(X_train, Y_train)
+
+        pred = model.predict(X_test)
+
+        results = {}
+        results['accuracy'] = metrics.accuracy_score(Y_test, pred)
+        print("[INFO] Finished Random Forest Fitting and Prediction")
+        
+        return results
 
     def initialize_dnn(self, input_shape, task='regression', summary=False, own_layers=None):
         """
