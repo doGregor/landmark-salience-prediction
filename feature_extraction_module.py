@@ -67,12 +67,13 @@ class FeatureExtractor():
             n_batches = math.ceil(image_batch.shape[0] / batch_size)
             x = np.array_split(image_batch, n_batches)
 
-        content_layers = ['block5_conv2']
+        content_layers = ['block4_conv2']
 
         content_extractor = self._vgg_layers(content_layers, input_shape=input_shape)
 
         gram_outputs = []
-        for batch in x:
+        for idx_batch, batch in enumerate(x):
+            print("batch", idx_batch, "of", len(x))
             content_outputs = content_extractor(batch)
 
             for content_out in content_outputs:
@@ -127,7 +128,7 @@ class FeatureExtractor():
         num_locations = tf.cast(input_shape[1] * input_shape[2], tf.float32)
         return result / (num_locations)
 
-    def dictionary_learning(self, train_data, test_data, components=100, save_fig=True, save_model=True):
+    def dictionary_learning(self, train_data, test_data, components=100, save_fig=True, save_model=True, save_name=''):
         """
         Learns a dictionary from train data and applies it to train and test data.
         :param train_data: Image batch in (x,y,z,1) grayscale format (train)
@@ -135,6 +136,7 @@ class FeatureExtractor():
         :param components: Number of atoms in dictionary to be extracted
         :param save_fig: If true 9 random components are plotted
         :param save_model: If true fitted dictionary model is saved as pickle file
+        :param save_name: Name of the pickle file if save_model=True
         :return: returns transformed train and test data in (x,components) format
         """
         print("[INFO] Starting Dictionary Learning")
@@ -149,7 +151,10 @@ class FeatureExtractor():
         if save_model:
             dict_results = {}
             dict_results["model"] = dictionary
-            with open(r"learning_output/dictionary_learning.pickle", "wb") as output_file:
+            dict_results["train_data"] = train_data_dl
+            dict_results["test_data"] = test_data_dl
+            save_path = "learning_output/" + save_name + "_dictionary_learning.pickle"
+            with open(save_path, "wb") as output_file:
                 pickle.dump(dict_results, output_file)
 
         if save_fig:
