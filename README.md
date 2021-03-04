@@ -73,3 +73,7 @@ vgg19 = prediction_module.initialize_cnn_for_regression(model_name='vgg19')
 prediction_module.train_cnn_for_regression(vgg19, X_train, Y_train, X_test, Y_test, epochs=25, batch_size=16, save=False,
                                            evaluate=True, verbose=0)
 ```
+
+### `plots/`
+
+Contains plots of model training processes (evaluation/results).
