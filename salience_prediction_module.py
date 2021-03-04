@@ -332,9 +332,9 @@ class SaliencePrediction():
         Training of previously initialized model for classification task
         :param model: Initialized model from func:initialize_cnn_for_classification
         :param train_data: normalized batch of train images
-        :param train_labels: labels associated with train_data, float value array
+        :param train_labels: labels associated with train_data, binary labels array
         :param test_data: normalized batch of test images
-        :param test_labels: normalized batch of test images (are also used for validation
+        :param test_labels: labels associated with train_data, binary labels array (are also used for validation
         shared test/val set)
         :param epochs: Number of epochs for model fine-tuning/training
         :param class_weights: Weights for appearance of labels in train data
@@ -458,11 +458,11 @@ class SaliencePrediction():
         
         return results
 
-    def initialize_dnn(self, input_shape, task='regression', summary=False, own_layers=None):
+    def initialize_dnn_regression(self, input_shape, learning_rate=0.0001, summary=False, own_layers=None):
         """
-        Initialize MLP as final model for training with combined features
+        Initialize MLP for training with combined features (regression)
         :param input_shape: Input shape of the feature vectors
-        :param task: Whether it should be initialized for regression or classification
+        :param learning_rate: learning rate for optimization
         :param summary: Whether summary of model should be displayed
         :param own_layers: List of keras layers to initialize model with if default is not wanted
         :return: returns initialized MLP
@@ -474,27 +474,135 @@ class SaliencePrediction():
                 model.add(layer)
         else:
             model.add(tf.keras.layers.InputLayer(input_shape=input_shape))
-            model.add(tf.keras.layers.Dense(250, activation='relu'))
-            model.add(tf.keras.layers.Dense(250, activation='relu'))
-            model.add(tf.keras.layers.Dense(100, activation='relu'))
-            model.add(tf.keras.layers.Dropout(0.5))
-
-        if task == 'regression':
-            model.add(tf.keras.layers.Dense(1, activation='linear'))
-            opt = tf.keras.optimizers.SGD(lr=0.001)
-            model.compile(loss='mean_absolute_error', optimizer=opt, metrics=['mse', 'mae', 'mape'])
-        elif task == 'classification':
-            model.add(tf.keras.layers.Dense(1, activation='sigmoid'))
-            model.compile(optimizer=tf.keras.optimizers.RMSprop(lr=2e-5),
-                          loss='binary_crossentropy',
-                          metrics=['accuracy'])
-        else:
-            sys.exit("Wrong parameter for model initialization")
+            model.add(tf.keras.layers.Dense(128, activation='relu'))
+            model.add(tf.keras.layers.Dense(32, activation='relu'))
+            
+        model.add(tf.keras.layers.Dense(1, activation='linear'))
+        opt = tf.keras.optimizers.SGD(lr=learning_rate)
+        model.compile(loss='mean_absolute_error', optimizer=opt, metrics=['mse', 'mae', 'mape'])
 
         if summary:
             model.summary()
 
         return model
+    
+    def initialize_dnn_classification(self, input_shape, learning_rate=0.0001, summary=False, own_layers=None):
+        """
+        Initialize MLP for training with combined features (classification)
+        :param input_shape: Input shape of the feature vectors
+        :param learning_rate: learning rate for optimization
+        :param summary: Whether summary of model should be displayed
+        :param own_layers: List of keras layers to initialize model with if default is not wanted
+        :return: returns initialized MLP
+        """
+        model = tf.keras.models.Sequential()
+
+        if own_layers is not None:
+            for layer in own_layers:
+                model.add(layer)
+        else:
+            model.add(tf.keras.layers.InputLayer(input_shape=input_shape))
+            #model.add(tf.keras.layers.Dense(256, activation='relu'))
+            model.add(tf.keras.layers.Dense(256, activation='relu'))
+            #model.add(tf.keras.layers.Dense(128, activation='relu'))
+            #model.add(tf.keras.layers.Dropout(0.5))
+                
+        model.add(tf.keras.layers.Dense(1, activation='sigmoid'))
+        
+        #opt = tf.keras.optimizers.SGD(lr=learning_rate)
+        opt = tf.keras.optimizers.Adam(lr=learning_rate)
+
+        model.compile(optimizer=opt,
+                      loss='binary_crossentropy',
+                      metrics=['accuracy'])
+        
+        if summary:
+            model.summary()
+
+        return model
+    
+    def train_dnn_regression(self, model, train_data, train_labels, test_data, test_labels, epochs=30, batch_size=16,
+                             save=False, save_name='regression', verbose=1, delete=True, plot=False, evaluate=True):
+        """
+        Training of previously initialized model for classification task
+        :param model: Initialized model from func:initialize_dnn_classification
+        :param train_data: normalized batch of train data vectors
+        :param train_labels: labels associated with train_data, float value array
+        :param test_data: normalized batch of test data vectors
+        :param test_labels: labels associated with test_data, float value array (are also used for validation
+        shared test/val set)
+        :param epochs: Number of epochs for model fine-tuning/training
+        :param batch_size: Number of samples used for each step in each epoch
+        :param save: Whether model should be saved to .h5 file
+        :param evaluate: Whether model should be evaluated after training, saves plots of metrics
+        :param save_name: Name for saved .h5 file or/and metric plots
+        :param verbose: Degree of information details for training process
+        :param delete: Whether model should be deleted after evaluation (clear space in memory)
+        :return: returns nothing
+        """
+        history = model.fit(train_data, train_labels, epochs=epochs,
+                            validation_data=(test_data, test_labels),
+                            batch_size=batch_size, verbose=verbose)
+
+        if evaluate:
+            results_train_evaluation = model.evaluate(train_data, train_labels, batch_size=batch_size)
+            print("train loss, train mse, train mae, train mape:", results_train_evaluation)
+            
+            results_test_evaluation = model.evaluate(test_data, test_labels, batch_size=batch_size)
+            print("test loss, test mse, test mae, test mape:", results_test_evaluation)
+            
+        if plot:
+            self.regression_metrics_plots(history=history, save_name=save_name)
+
+        if save:
+            path = "nn_models/dnn_" + save_name + ".h5"
+            model.save(path)
+            
+        if delete:
+            del model
+    
+    def train_dnn_classification(self, model, train_data, train_labels, test_data, test_labels, epochs=30, batch_size=16,
+                                 save=False, class_weights=None, save_name='classification', verbose=1, delete=True,
+                                 plot=False, evaluate=True, callback=None):
+        """
+        Training of previously initialized model for classification task
+        :param model: Initialized model from func:initialize_dnn_classification
+        :param train_data: normalized batch of train data vectors
+        :param train_labels: labels associated with train_data, binary labels array
+        :param test_data: normalized batch of test data vectors
+        :param test_labels: labels associated with test_data, binary labels array (are also used for validation
+        shared test/val set)
+        :param epochs: Number of epochs for model fine-tuning/training
+        :param class_weights: Weights for appearance of labels in train data
+        :param batch_size: Number of samples used for each step in each epoch
+        :param save: Whether model should be saved to .h5 file
+        :param evaluate: Whether model should be evaluated after training, saves plots of metrics
+        :param save_name: Name for saved .h5 file or/and metric plots
+        :param verbose: Degree of information details for training process
+        :param delete: Whether model should be deleted after evaluation (clear space in memory)
+        :param callback: callbacks for fit function; e.g. learning rate scheduler
+        :return: returns nothing
+        """
+        history = model.fit(train_data, train_labels, validation_data=(test_data, test_labels),
+                            epochs=epochs, batch_size=batch_size, class_weight=class_weights, verbose=verbose,
+                            callbacks=callback)
+
+        if evaluate:
+            results_train_evaluation = model.evaluate(train_data, train_labels, batch_size=batch_size)
+            print("train loss, train acc:", results_train_evaluation)
+            
+            results_test_evaluation = model.evaluate(test_data, test_labels, batch_size=batch_size)
+            print("test loss, test acc:", results_test_evaluation)
+            
+        if plot:
+            self.classification_metrics_plots(history=history, save_name=save_name)
+
+        if save:
+            path = "nn_models/dnn_" + save_name + ".h5"
+            model.save(path)
+            
+        if delete:
+            del model
 
 
 if __name__ == '__main__':
