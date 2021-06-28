@@ -1,7 +1,8 @@
-# landmarks_salience_prediction
-#### Master Thesis Information Science, University of Regensburg, 2021
+# landmarks-salience-prediction
  
-The project's goal is to test whether it is possible to predict landmark related salience based on image data (visual information). Landmarks are a frequently used concept in pedestrian navigation to help people orientating in their environment. The predictions are made using methods of machine learning, particularly of deep learning.
+The project's goal is to evaluate the proportion of landmark salience that is encoded by visual object information. We test whether it is possible to predict landmark related salience based on image data (visual information). Landmarks are a frequently used concept in pedestrian navigation to help people orientating in unfamiliar environment. We make predictions using methods of machine learning, particularly of deep learning.
+
+INFO: image dataset will be released on 3rd party server if paper is accepted (to large in size for GitHub)
 
 ## Project Structure
 
@@ -11,7 +12,7 @@ The project's goal is to test whether it is possible to predict landmark related
 * `salience_prediction_module.py`
 
 A csv file with salience values is located in the `salience_csv` folder.
-The raw image data (298x224 pixels) are available on request (too large in size for github).
+The raw image data (298x224 pixels) are currently only available on request (too large in size for GitHub).
 
 Methods from the 3 main modules are merged in jupyter notebooks (`dnn_classifier.ipynb`, `feature_ranking.ipynb`, `transfer_learning.ipynb`, `XAI.ipynb`).
 
@@ -19,7 +20,7 @@ Methods from the 3 main modules are merged in jupyter notebooks (`dnn_classifier
 
 This module contains functionality to load the images as numpy arrays and
 the associated salience labels as X and Y data. It is also possible to load
-binary labels which are produced by clustering and density estimation (EM)
+binary labels which are produced by k-means clustering and expectation maximization density estimation
 implemented in `scripts/salience_clustering.py`. There are also a number of
 parameters that can be used when calling data loading functions, for example 
 whether the image data should be RGB or grayscale as well as the cross-validation
