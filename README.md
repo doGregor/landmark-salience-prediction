@@ -2,7 +2,7 @@
  
 The project's goal is to evaluate the proportion of landmark salience that is encoded by visual object information. We test whether it is possible to predict landmark related salience based on image data (visual information). Landmarks are a frequently used concept in pedestrian navigation to help people orientating in unfamiliar environment. We make predictions using methods of machine learning, particularly of deep learning.
 
-INFO: image dataset will be released on 3rd party server if paper is accepted (to large in size for GitHub)
+Image dataset: https://drive.google.com/file/d/1GsP-0QIO7FlCV5450AZA-hmFUi1X8uNT/view?usp=sharing
 
 ## Project Structure
 
@@ -12,7 +12,7 @@ INFO: image dataset will be released on 3rd party server if paper is accepted (t
 * `salience_prediction_module.py`
 
 A csv file with salience values is located in the `salience_csv` folder.
-The raw image data (298x224 pixels) are currently only available on request (too large in size for GitHub).
+The raw image data (298x224 pixels) can be downloaded via https://drive.google.com/file/d/1GsP-0QIO7FlCV5450AZA-hmFUi1X8uNT/view?usp=sharing.
 
 Methods from the 3 main modules are merged in jupyter notebooks (`dnn_classifier.ipynb`, `feature_ranking.ipynb`, `transfer_learning.ipynb`, `XAI.ipynb`).
 
